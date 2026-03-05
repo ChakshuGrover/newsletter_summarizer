@@ -145,6 +145,7 @@ def fetch_newsletter_emails(service, window_start, window_end):
         query = f"label:ai-newsletters newer_than:2d -from:{user_email}"
         results = service.users().messages().list(userId='me', q=query).execute()
         messages = results.get('messages', [])
+        logging.info(f"Found {len(messages)} messages matching the filter.")
         
         filtered_emails = []
         for message in messages:
@@ -155,6 +156,7 @@ def fetch_newsletter_emails(service, window_start, window_end):
             if date:
                 date_obj = parsedate_to_datetime(date)
                 if date_obj < window_start or date_obj >= window_end:
+                    logging.info(f"Skipping email {message['id']} outside window.")
                     continue
             
             html_body = None
@@ -199,6 +201,9 @@ def fetch_newsletter_emails(service, window_start, window_end):
                     'body': message_body.strip(),
                     'link': article_link
                 })
+                logging.info(f"Found an email from '{sender_name}' with subject: {subject}")
+        
+        logging.info(f"Total filtered emails: {len(filtered_emails)}")
         return filtered_emails
     except Exception as e:
         logging.error(f"Error fetching emails: {e}")

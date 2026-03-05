@@ -30,7 +30,7 @@ class AISummarizer:
         self.current_key_index = 0
         if API_KEYS:
             genai.configure(api_key=API_KEYS[0])
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
+        self.model = genai.GenerativeModel('gemini-3-flash-preview')
         self.system_prompt = """You are an expert content curator. Summarize the provided newsletter content into a clean, well-formatted HTML response, filtering out any promotional material like ads, job postings, or subscription pleas.
 - Use `<ul>` and `<li>` for bullet points.
 - Do NOT include the newsletter's subject; it will be added separately.
