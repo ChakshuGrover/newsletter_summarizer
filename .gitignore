@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Credentials and Secrets
+.env
+credentials.json
+credentials_old_*.json
+token.pickle
+
+# State and History
+last_run_date.txt
+top_stories_history.json
+
+# Logs
+*.log
+*.err
