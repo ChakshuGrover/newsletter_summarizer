@@ -5,7 +5,7 @@ import argparse
 import sys
 
 from config import (
-    setup_logging, LAST_RUN_FILE, EXPECTED_EMAIL, RECIPIENT_EMAIL
+    setup_logging, LAST_RUN_FILE, EXPECTED_EMAIL, RECIPIENT_EMAILS
 )
 from gmail_manager import (
     get_gmail_service, get_user_email, fetch_newsletter_emails, send_email
@@ -65,8 +65,9 @@ def main():
         for s in summaries:
             html_body += f"<h2>{s['sender']} - {s['subject']}</h2>{s['summary_text']}<br><hr>"
 
-        logging.info(f"Sending digest email to {RECIPIENT_EMAIL}")
-        send_email(service, RECIPIENT_EMAIL, subject, html_body)
+        to_list = ", ".join(RECIPIENT_EMAILS)
+        logging.info(f"Sending digest email to {to_list}")
+        send_email(service, to_list, subject, html_body)
 
         # 6. LinkedIn & Telegram
         linkedin_posts = summarizer.generate_linkedin_posts(summaries)

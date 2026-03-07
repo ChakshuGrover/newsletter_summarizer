@@ -28,7 +28,10 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify'
 ]
 EXPECTED_EMAIL = "chakshugrover.newsletters@gmail.com"
-RECIPIENT_EMAIL = "chakshu.grover8@gmail.com"
+RECIPIENT_EMAILS = [
+    "chakshu.grover8@gmail.com",
+    "karansinghkjs346@gmail.com",
+]
 
 # Logging Setup
 def setup_logging():

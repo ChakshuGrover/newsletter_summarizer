@@ -43,6 +43,10 @@ def get_gmail_service():
                     creds = None
         
         if not creds or not creds.valid:
+            if not sys.stdin.isatty():
+                logging.error("No valid credentials found and not running in an interactive terminal. Cannot start OAuth flow.")
+                raise Exception("Non-interactive environment: credentials expired or not found.")
+
             logging.info("No valid credentials found. Starting OAuth flow...")
             flow = InstalledAppFlow.from_client_secrets_file(SECRET_FILE, SCOPES)
             
@@ -53,7 +57,7 @@ def get_gmail_service():
             
             redirect_uri = f'http://localhost:{port}/'
             flow.redirect_uri = redirect_uri
-            auth_url, _ = flow.authorization_url(access_type='offline')
+            auth_url, _ = flow.authorization_url(access_type='offline', prompt='consent')
             webbrowser.open(auth_url)
             
             auth_code = None
