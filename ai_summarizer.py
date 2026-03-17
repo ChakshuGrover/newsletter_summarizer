@@ -177,7 +177,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                 logging.error(f"Error summarizing {email['subject']}: {e}")
         return summaries
 
-    def get_top_stories(self, summaries):
+    def get_top_stories(self, summaries, update_history=True):
         history = []
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=15)).isoformat()
         today_prefix = datetime.datetime.now().isoformat()[:10]
@@ -193,7 +193,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
         for i, item in enumerate(summaries):
             combined += f"Story {i+1}:\nSubject: {item['subject']}\nSender: {item['sender']}\nSummary: {item['summary_text']}\n\n"
 
-        prompt = f"""From the following newsletter summaries, identify the top AI & Tech stories (maximum 10).
+        prompt = f"""From the following newsletter summaries, identify the top AI & Tech stories (maximum 20).
     
     **CRITICAL INSTRUCTION:**
     1. Select ONLY stories that are truly new, highly relevant, and significant. Quality is more important than quantity.
@@ -222,7 +222,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                     reason = li.get_text().replace(b.get_text(), "").replace("Reason:", "").strip()
                     new_entries.append({'subject': subj, 'reason': reason, 'date': today_iso})
             
-            if new_entries:
+            if new_entries and update_history:
                 history.extend(new_entries)
                 with open(HISTORY_FILE, 'w') as f: json.dump(history, f, indent=2)
             

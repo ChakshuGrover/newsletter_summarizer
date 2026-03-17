@@ -146,7 +146,7 @@ def fetch_newsletter_emails(service, window_start, window_end):
     logging.info(f"Checking for emails between {window_start} and {window_end}.")
     try:
         user_email = get_user_email(service)
-        query = f"label:ai-newsletters newer_than:2d -from:{user_email}"
+        query = f"label:ai-newsletters newer_than:7d -from:{user_email}"
         results = service.users().messages().list(userId='me', q=query).execute()
         messages = results.get('messages', [])
         logging.info(f"Found {len(messages)} messages matching the filter.")

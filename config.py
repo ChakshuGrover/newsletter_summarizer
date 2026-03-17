@@ -18,7 +18,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 SECRET_FILE = "credentials.json"
 TOKEN_PICKLE_FILE = 'token.pickle'
 HISTORY_FILE = 'top_stories_history.json'
-LOG_FILE = 'filter.log'
+LOG_FILE = 'newsletter_summarizer.log'
 LAST_RUN_FILE = 'last_run_date.txt'
 
 # Gmail Settings

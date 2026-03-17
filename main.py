@@ -35,7 +35,21 @@ def main():
     today_6am = now.replace(hour=6, minute=0, second=0, microsecond=0)
     base_target_end = today_6am if now >= today_6am else today_6am - datetime.timedelta(days=1)
     window_end = base_target_end - datetime.timedelta(days=args.days_offset)
-    window_start = window_end - datetime.timedelta(days=1)
+    
+    # Run only on Wednesday (2) and Saturday (5)
+    weekday = window_end.weekday()
+    if weekday == 2:
+        window_start = window_end - datetime.timedelta(days=4)
+    elif weekday == 5:
+        window_start = window_end - datetime.timedelta(days=3)
+    else:
+        if not args.force:
+            logging.info(f"Today is not a scheduled run day (Wednesday or Saturday). Exiting.")
+            return
+        else:
+            logging.info(f"Force flag used on non-scheduled run day. Defaulting to 1-day window.")
+            window_start = window_end - datetime.timedelta(days=1)
+
     target_date_str = window_end.isoformat()
 
     # 3. Guard Logic
@@ -49,7 +63,10 @@ def main():
     emails = fetch_newsletter_emails(service, window_start, window_end)
     if not emails:
         logging.info("No new emails. Marking window as processed.")
-        with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
+        if not args.force:
+            with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
+        else:
+            logging.info("Forced run: Skipping LAST_RUN_FILE update despite no emails.")
         return
 
     summarizer = AISummarizer()
@@ -59,26 +76,40 @@ def main():
         # 5. Generate Digest and Send Email
         date_range_str = f"{window_start.strftime('%b %d')} - {window_end.strftime('%b %d, %Y')}"
         subject = f"AI & Tech Newsletters Daily Digest - {date_range_str}"
-        top_stories_html = summarizer.get_top_stories(summaries)
+        top_stories_html = summarizer.get_top_stories(summaries, update_history=not args.force)
         
         html_body = f"<h1>Top AI & Tech Stories</h1>{top_stories_html}<br><hr>"
         for s in summaries:
             html_body += f"<h2>{s['sender']} - {s['subject']}</h2>{s['summary_text']}<br><hr>"
 
-        to_list = ", ".join(RECIPIENT_EMAILS)
+        # Filter recipients for forced runs
+        active_recipients = RECIPIENT_EMAILS
+        if args.force:
+            active_recipients = ["chakshu.grover8@gmail.com"]
+            logging.info(f"Forced run detected. Overriding recipients to: {active_recipients}")
+
+        to_list = ", ".join(active_recipients)
         logging.info(f"Sending digest email to {to_list}")
         send_email(service, to_list, subject, html_body)
 
         # 6. LinkedIn & Telegram
         linkedin_posts = summarizer.generate_linkedin_posts(summaries)
         if linkedin_posts:
-            send_telegram_message("📢 *Daily LinkedIn Post Options* (Ready to Copy/Paste):")
-            for post in linkedin_posts:
-                send_telegram_message(post)
+            header = "📢 *Daily LinkedIn Post Options* (Ready to Copy/Paste):"
+            if args.force:
+                header = "🧪 *[TEST RUN] LinkedIn Post Options*:"
+            
+            # send_telegram_message(header)
+            # for post in linkedin_posts:
+            #     send_telegram_message(post)
+            logging.info("Telegram notifications are currently disabled.")
 
     # 7. Update state
-    with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
-    logging.info("Main process complete.")
+    if not args.force:
+        with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
+        logging.info("Main process complete.")
+    else:
+        logging.info("Forced run complete. Persistent state (last run & history) was not updated.")
 
 if __name__ == '__main__':
     main()
