@@ -202,6 +202,7 @@ def fetch_newsletter_emails(service, window_start, window_end):
                     'id': message['id'],
                     'subject': subject,
                     'sender': sender_name or 'Unknown Sender',
+                    'date': date_obj.strftime('%Y-%m-%d %H:%M:%S %Z'),
                     'body': message_body.strip(),
                     'link': article_link
                 })

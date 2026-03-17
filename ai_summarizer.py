@@ -40,7 +40,8 @@ class AISummarizer:
 - Do NOT include the newsletter's subject; it will be added separately.
 - Each bullet point should be on a new line.
 - Keep the summary concise and focused on the most significant information only.
-- Try to keep it to 5 to 7 bullet points, capturing only the most significant and impactful information."""
+- Try to keep it to 5 to 7 bullet points, capturing only the most significant and impactful information.
+- CRITICAL: Prioritize truly current events and news. If a newsletter mentions historical news (e.g., "Looking back at 2024..." or "Last year OpenAI did X"), ignore it unless it contains significant new updates or impacts."""
 
     def retry_with_backoff(self, func, max_retries=3, initial_delay=5):
         for attempt in range(max_retries):
@@ -84,7 +85,7 @@ class AISummarizer:
                 'sender': email['sender'], 
                 'link': email.get('link')
             })
-            emails_text += f"\n--- Email {i+1} ---\nSubject: {email['subject']}\nFrom: {email['sender']}\nContent:\n{email['body']}\n---\n"
+            emails_text += f"\n--- Email {i+1} ---\nSubject: {email['subject']}\nFrom: {email['sender']}\nDate: {email.get('date', 'Unknown')}\nContent:\n{email['body']}\n---\n"
 
         batch_prompt = f"""{self.system_prompt}
 
