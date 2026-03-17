@@ -177,17 +177,64 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                 logging.error(f"Error summarizing {email['subject']}: {e}")
         return summaries
 
+    def generate_landscape_commentary(self, summaries):
+        if not summaries:
+            return ""
+        
+        combined = ""
+        for i, item in enumerate(summaries):
+            combined += f"Subject: {item['subject']}\nSummary: {item['summary_text']}\n\n"
+            
+        prompt = f"""Act as a high-level technology analyst and ghostwriter. Analyze the following AI and Tech newsletter summaries and provide a single, punchy paragraph (maximum 5 sentences) that captures the overarching progression and 'vibe' of the industry over the last few days.
+        
+        CRITICAL REQUIREMENTS:
+        - Output ONLY the paragraph in PLAIN TEXT.
+        - DO NOT use any Markdown (no bolding, no headers like ###, no bullet points, no **).
+        - DO NOT include ANY introductory or concluding conversational filler. 
+        - DO NOT start with phrases like "Based on the summaries provided..." or "Here is an analysis...". Start immediately with the analysis.
+        - Focus on a high-level synthesis: Connect the dots between different news items rather than just listing them.
+        
+        Newsletter Summaries:
+        {combined}"""
+        
+        try:
+            resp = self.retry_with_backoff(lambda: self.model.generate_content(prompt))
+            return resp.text.strip() if resp and resp.text else ""
+        except Exception as e:
+            logging.error(f"Error generating commentary: {e}")
+            return ""
+
+    def generate_contrarian_take(self, top_story):
+        if not top_story:
+            return ""
+            
+        prompt = f"""Act as a sharp, highly analytical tech skeptic. Given the following major news story, provide a single-sentence 'Contrarian Take' or 'Devil's Advocate' perspective that highlights potential risks, overhyped aspects, or hidden downsides.
+        
+        Story Title: {top_story.get('title', '')}
+        Story News: {top_story.get('news', '')}
+        """
+        
+        try:
+            resp = self.retry_with_backoff(lambda: self.model.generate_content(prompt))
+            return resp.text.strip() if resp and resp.text else ""
+        except Exception as e:
+            logging.error(f"Error generating contrarian take: {e}")
+            return ""
+
     def get_top_stories(self, summaries, update_history=True):
         history = []
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=15)).isoformat()
         today_prefix = datetime.datetime.now().isoformat()[:10]
         
         if os.path.exists(HISTORY_FILE):
-            with open(HISTORY_FILE, 'r') as f:
-                history = json.load(f)
+            try:
+                with open(HISTORY_FILE, 'r') as f:
+                    history = json.load(f)
+            except json.JSONDecodeError:
+                history = []
         
-        dedup_history = [item for item in history if item.get('date') > cutoff and not item.get('date', '').startswith(today_prefix)]
-        history_context = [f"Subject: {item['subject']} | Summary: {item.get('reason', '')}" for item in dedup_history]
+        dedup_history = [item for item in history if item.get('date', '') > cutoff and not item.get('date', '').startswith(today_prefix)]
+        history_context = [{"title": item.get('title', item.get('subject', '')), "impact": item.get('impact', item.get('reason', ''))} for item in dedup_history]
 
         combined = ""
         for i, item in enumerate(summaries):
@@ -195,41 +242,58 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
 
         prompt = f"""From the following newsletter summaries, identify the top AI & Tech stories (maximum 20).
     
-    **CRITICAL INSTRUCTION:**
-    1. Select ONLY stories that are truly new, highly relevant, and significant. Quality is more important than quantity.
-    2. Do NOT include any stories that are substantially similar to the following recent top stories from the last 15 days:
+    **CRITICAL INSTRUCTIONS:**
+    1. Compare these new stories against the recent history provided below.
+    2. Categorize each new story with a Tag:
+       - 🟢 [New Break]: Entirely new developments.
+       - 🔵 [Developing]: Significant updates to an ongoing storyline from the history.
+       - 🔴 [Contradiction]: A pivot, reversal, or contradiction to a previous historical story.
+    3. Ignore stories that are merely repetitions of history without significant updates.
+    4. Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
+    
+    **Recent History Context:**
     {json.dumps(history_context, indent=2)}
 
-    Rank them in decreasing order of importance. Format the output as an HTML unordered list (`<ul>` and `<li>`).
-    Structure each list item exactly like this:
-    <li><b>The Subject Title</b> The reason for importance.</li>
+    **Output Format:**
+    You MUST respond with ONLY valid JSON. Return an array of JSON objects, where each object has EXACTLY these keys:
+    - "title": (string) The subject title.
+    - "tag": (string) Either "🟢 [New Break]", "🔵 [Developing]", or "🔴 [Contradiction]".
+    - "news": (string) The concise summary.
+    - "impact": (string) The "So What?" impact statement.
 
     Newsletter Summaries:
     {combined}"""
         
         try:
             resp = self.retry_with_backoff(lambda: self.model.generate_content(prompt))
-            html = resp.text.replace("```html", "").replace("```", "").strip() if resp and resp.text else ""
+            raw_text = resp.text.replace("```json", "").replace("```", "").strip() if resp and resp.text else "[]"
             
-            # Update history (Restored robust parsing from original)
-            soup = BeautifulSoup(html, 'html.parser')
-            new_entries = []
-            today_iso = datetime.datetime.now().isoformat()
-            for li in soup.find_all('li'):
-                b = li.find('b')
-                if b:
-                    subj = b.get_text().replace("Subject:", "").strip()
-                    reason = li.get_text().replace(b.get_text(), "").replace("Reason:", "").strip()
-                    new_entries.append({'subject': subj, 'reason': reason, 'date': today_iso})
+            # Simple json repair if markdown codeblocks were used incorrectly
+            if not raw_text.startswith("["):
+                raw_text = raw_text[raw_text.find("["):]
+            if not raw_text.endswith("]"):
+                raw_text = raw_text[:raw_text.rfind("]")+1]
+                
+            top_stories_data = json.loads(raw_text)
             
-            if new_entries and update_history:
+            if top_stories_data and update_history:
+                today_iso = datetime.datetime.now().isoformat()
+                new_entries = []
+                for story in top_stories_data:
+                    new_entries.append({
+                        'title': story.get('title', ''),
+                        'tag': story.get('tag', ''),
+                        'news': story.get('news', ''),
+                        'impact': story.get('impact', ''),
+                        'date': today_iso
+                    })
                 history.extend(new_entries)
                 with open(HISTORY_FILE, 'w') as f: json.dump(history, f, indent=2)
             
-            return html
+            return top_stories_data
         except Exception as e:
             logging.error(f"Error getting top stories: {e}")
-            return "<p>Could not retrieve top stories.</p>"
+            return []
 
     def generate_linkedin_posts(self, summaries):
         # Restored the full, high-quality LinkedIn prompt from original

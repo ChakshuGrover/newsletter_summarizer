@@ -73,12 +73,42 @@ def main():
     summaries = summarizer.summarize_emails(emails)
 
     if summaries:
-        # 5. Generate Digest and Send Email
+        # 5. Generate Insights and Digest
         date_range_str = f"{window_start.strftime('%b %d')} - {window_end.strftime('%b %d, %Y')}"
         subject = f"AI & Tech Newsletters Daily Digest - {date_range_str}"
-        top_stories_html = summarizer.get_top_stories(summaries, update_history=not args.force)
         
-        html_body = f"<h1>Top AI & Tech Stories</h1>{top_stories_html}<br><hr>"
+        logging.info("Generating macro landscape commentary...")
+        commentary = summarizer.generate_landscape_commentary(summaries)
+        
+        logging.info("Extracting top stories and generating contrarian take...")
+        top_stories_data = summarizer.get_top_stories(summaries, update_history=not args.force)
+        
+        html_body = ""
+        if commentary:
+            html_body += f"<h2>Macro Landscape Commentary</h2>"
+            html_body += f"<blockquote style='font-style: italic; color: #555; padding-left: 15px; border-left: 4px solid #ccc;'>{commentary}</blockquote><hr>"
+        
+        html_body += f"<h1>Top AI & Tech Stories</h1>"
+        if not top_stories_data:
+            html_body += "<p>No top stories found.</p><hr>"
+        else:
+            for i, story in enumerate(top_stories_data):
+                tag_str = story.get('tag', '')
+                html_body += f"<h3>{i+1}. {story.get('title', 'Unknown')} {tag_str}</h3>"
+                
+                # Contrarian Take for top 5 stories
+                if i < 5:
+                    contrarian_take = summarizer.generate_contrarian_take(story)
+                    html_body += f"<p><b>The News:</b> {story.get('news', '')}</p>"
+                    html_body += f"<p><b>The Impact:</b> {story.get('impact', '')}</p>"
+                    if contrarian_take:
+                        html_body += f"<div style='background-color: #ffebee; padding: 10px; border-left: 4px solid #f44336; margin-top: 10px; margin-bottom: 10px; border-radius: 4px;'><b>The Contrarian Take:</b> {contrarian_take}</div>"
+                else:
+                    html_body += f"<ul><li><b>The News:</b> {story.get('news', '')}</li>"
+                    html_body += f"<li><b>The Impact:</b> {story.get('impact', '')}</li></ul>"
+            html_body += "<hr>"
+            
+        html_body += "<h1>All Summarized Newsletters</h1>"
         for s in summaries:
             html_body += f"<h2>{s['sender']} - {s['subject']}</h2>{s['summary_text']}<br><hr>"
 
@@ -92,17 +122,17 @@ def main():
         logging.info(f"Sending digest email to {to_list}")
         send_email(service, to_list, subject, html_body)
 
-        # 6. LinkedIn & Telegram
-        linkedin_posts = summarizer.generate_linkedin_posts(summaries)
-        if linkedin_posts:
-            header = "📢 *Daily LinkedIn Post Options* (Ready to Copy/Paste):"
-            if args.force:
-                header = "🧪 *[TEST RUN] LinkedIn Post Options*:"
-            
-            # send_telegram_message(header)
-            # for post in linkedin_posts:
-            #     send_telegram_message(post)
-            logging.info("Telegram notifications are currently disabled.")
+        # 6. LinkedIn & Telegram (Disabled for now)
+        # linkedin_posts = summarizer.generate_linkedin_posts(summaries)
+        # if linkedin_posts:
+        #     header = "📢 *Daily LinkedIn Post Options* (Ready to Copy/Paste):"
+        #     if args.force:
+        #         header = "🧪 *[TEST RUN] LinkedIn Post Options*:"
+
+        #     # send_telegram_message(header)
+        #     # for post in linkedin_posts:
+        #     #     send_telegram_message(post)
+        #     logging.info("Telegram notifications are currently disabled.")
 
     # 7. Update state
     if not args.force:
