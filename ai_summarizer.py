@@ -223,7 +223,8 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
 
     def get_top_stories(self, summaries, update_history=True):
         history = []
-        cutoff = (datetime.datetime.now() - datetime.timedelta(days=15)).isoformat()
+        # Extended window to 30 days for better "Story Arc" tracking
+        cutoff = (datetime.datetime.now() - datetime.timedelta(days=30)).isoformat()
         today_prefix = datetime.datetime.now().isoformat()[:10]
         
         if os.path.exists(HISTORY_FILE):
@@ -233,8 +234,9 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
             except json.JSONDecodeError:
                 history = []
         
-        dedup_history = [item for item in history if item.get('date', '') > cutoff and not item.get('date', '').startswith(today_prefix)]
-        history_context = [{"title": item.get('title', item.get('subject', '')), "impact": item.get('impact', item.get('reason', ''))} for item in dedup_history]
+        # Filter history to only include the last 30 days, excluding today (to avoid feedback loops)
+        active_history = [item for item in history if item.get('date', '') > cutoff and not item.get('date', '').startswith(today_prefix)]
+        history_context = [{"title": item.get('title', item.get('subject', '')), "impact": item.get('impact', item.get('reason', ''))} for item in active_history]
 
         combined = ""
         for i, item in enumerate(summaries):
@@ -251,7 +253,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     3. Ignore stories that are merely repetitions of history without significant updates.
     4. Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
     
-    **Recent History Context:**
+    **Recent History Context (Last 30 Days):**
     {json.dumps(history_context, indent=2)}
 
     **Output Format:**
@@ -287,8 +289,11 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                         'impact': story.get('impact', ''),
                         'date': today_iso
                     })
-                history.extend(new_entries)
-                with open(HISTORY_FILE, 'w') as f: json.dump(history, f, indent=2)
+                
+                # Save only the active 30-day window + new entries to disk
+                updated_history = active_history + new_entries
+                with open(HISTORY_FILE, 'w') as f: 
+                    json.dump(updated_history, f, indent=2)
             
             return top_stories_data
         except Exception as e:
