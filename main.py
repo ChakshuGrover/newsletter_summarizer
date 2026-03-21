@@ -63,10 +63,7 @@ def main():
     emails = fetch_newsletter_emails(service, window_start, window_end)
     if not emails:
         logging.info("No new emails. Marking window as processed.")
-        if not args.force:
-            with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
-        else:
-            logging.info("Forced run: Skipping LAST_RUN_FILE update despite no emails.")
+        with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
         return
 
     summarizer = AISummarizer()
@@ -135,11 +132,8 @@ def main():
         #     logging.info("Telegram notifications are currently disabled.")
 
     # 7. Update state
-    if not args.force:
-        with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
-        logging.info("Main process complete.")
-    else:
-        logging.info("Forced run complete. Persistent state (last run & history) was not updated.")
+    with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
+    logging.info("Main process complete.")
 
 if __name__ == '__main__':
     main()

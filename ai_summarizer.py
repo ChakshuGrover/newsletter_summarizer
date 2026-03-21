@@ -41,7 +41,9 @@ class AISummarizer:
 - Each bullet point should be on a new line.
 - Keep the summary concise and focused on the most significant information only.
 - Try to keep it to 5 to 7 bullet points, capturing only the most significant and impactful information.
-- CRITICAL: Prioritize truly current events and news. If a newsletter mentions historical news (e.g., "Looking back at 2024..." or "Last year OpenAI did X"), ignore it unless it contains significant new updates or impacts."""
+- CRITICAL: Prioritize truly current events and news from the last 7 days. 
+- IGNORE historical recaps, long analytical essays reflecting on old deals, "looking back" sections, or background context unless there is a significant NEW development reported *today*.
+- If you are unsure if a piece of news is recent, err on the side of excluding it."""
 
     def retry_with_backoff(self, func, max_retries=3, initial_delay=5):
         for attempt in range(max_retries):
@@ -253,6 +255,15 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     3. Ignore stories that are merely repetitions of history without significant updates.
     4. Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
     
+    **CRITICAL RECENTNESS & GROUNDING RULES:**
+    1. ONLY identify stories that are reported as NEW or DEVELOPING breaking news within the provided summaries.
+    2. IGNORE analytical essays, historical recaps, deep dives into old news, or "looking back" sections.
+    3. If a story mentions a deal or event that occurred months ago (even if discussed in a recent essay), EXCLUDE it.
+    4. Ensure every story is grounded in a specific, recent factual event reported in the provided newsletter summaries.
+    5. The "title" and "news" MUST reflect a development from the last 7 days, not background context or historical analysis.
+    6. Be extremely selective: prefer 5 high-quality, truly recent stories over 20 mediocre or old ones.
+    7. If a newsletter is an analytical deep dive into Meta's past spending or strategy, DO NOT extract old deals as "Top Stories".
+
     **Recent History Context (Last 30 Days):**
     {json.dumps(history_context, indent=2)}
 
