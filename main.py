@@ -94,20 +94,31 @@ def main():
                 html_body += f"<h3>{i+1}. {story.get('title', 'Unknown')} {tag_str}</h3>"
                 
                 # Contrarian Take for top 5 stories
+                tag_reason = story.get('tag_reason', '')
                 if i < 5:
                     contrarian_take = summarizer.generate_contrarian_take(story)
                     html_body += f"<p><b>The News:</b> {story.get('news', '')}</p>"
                     html_body += f"<p><b>The Impact:</b> {story.get('impact', '')}</p>"
+                    if tag_reason:
+                        html_body += f"<p style='color: #2196F3; font-style: italic;'><b>Context:</b> {tag_reason}</p>"
                     if contrarian_take:
                         html_body += f"<div style='background-color: #ffebee; padding: 10px; border-left: 4px solid #f44336; margin-top: 10px; margin-bottom: 10px; border-radius: 4px;'><b>The Contrarian Take:</b> {contrarian_take}</div>"
                 else:
                     html_body += f"<ul><li><b>The News:</b> {story.get('news', '')}</li>"
-                    html_body += f"<li><b>The Impact:</b> {story.get('impact', '')}</li></ul>"
+                    html_body += f"<li><b>The Impact:</b> {story.get('impact', '')}</li>"
+                    if tag_reason:
+                        html_body += f"<li><span style='color: #2196F3; font-style: italic;'><b>Context:</b> {tag_reason}</span></li>"
+                    html_body += "</ul>"
             html_body += "<hr>"
             
-        html_body += "<h1>All Summarized Newsletters</h1>"
+        # Sources Scanned (Replacing redundant individual summaries)
+        html_body += "<p style='color: #777; font-size: 0.9em;'><b>Sources Scanned:</b> "
+        sources = []
         for s in summaries:
-            html_body += f"<h2>{s['sender']} - {s['subject']}</h2>{s['summary_text']}<br><hr>"
+            source_info = f"{s['sender']} ({s['subject']})"
+            sources.append(source_info)
+        html_body += ", ".join(sources)
+        html_body += "</p>"
 
         # Filter recipients for forced runs
         active_recipients = RECIPIENT_EMAILS

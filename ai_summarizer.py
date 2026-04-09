@@ -45,6 +45,32 @@ class AISummarizer:
 - IGNORE historical recaps, long analytical essays reflecting on old deals, "looking back" sections, or background context unless there is a significant NEW development reported *today*.
 - If you are unsure if a piece of news is recent, err on the side of excluding it."""
 
+    def _repair_json(self, raw_text):
+        """Repair common JSON formatting issues from AI output."""
+        if not raw_text:
+            return "[]"
+        
+        # Remove markdown code blocks
+        raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+        
+        # Try to find the start and end of the JSON array or object
+        start_idx = raw_text.find("[")
+        if start_idx == -1:
+            start_idx = raw_text.find("{")
+            
+        end_idx = raw_text.rfind("]")
+        if end_idx == -1:
+            end_idx = raw_text.rfind("}")
+            
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            raw_text = raw_text[start_idx:end_idx + 1]
+            
+        # Remove trailing commas before closing braces/brackets
+        raw_text = re.sub(r",\s*\]", "]", raw_text)
+        raw_text = re.sub(r",\s*\}", "}", raw_text)
+        
+        return raw_text
+
     def retry_with_backoff(self, func, max_retries=3, initial_delay=5):
         for attempt in range(max_retries):
             try:
@@ -244,7 +270,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
         for i, item in enumerate(summaries):
             combined += f"Story {i+1}:\nSubject: {item['subject']}\nSender: {item['sender']}\nSummary: {item['summary_text']}\n\n"
 
-        prompt = f"""From the following newsletter summaries, identify the top AI & Tech stories (maximum 20).
+        prompt = f"""From the following newsletter summaries, identify the top AI & Tech stories (maximum 30).
     
     **CRITICAL INSTRUCTIONS:**
     1. Compare these new stories against the recent history provided below.
@@ -254,6 +280,8 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
        - 🔴 [Contradiction]: A pivot, reversal, or contradiction to a previous historical story.
     3. Ignore stories that are merely repetitions of history without significant updates.
     4. Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
+    5. For 🔵 [Developing] or 🔴 [Contradiction] stories, provide a ONE-LINE "Tag Reason" that explains exactly what it follows or contradicts from the history. If it is 🟢 [New Break], leave it empty.
+    6. UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
     
     **CRITICAL RECENTNESS & GROUNDING RULES:**
     1. ONLY identify stories that are reported as NEW or DEVELOPING breaking news within the provided summaries.
@@ -261,7 +289,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     3. If a story mentions a deal or event that occurred months ago (even if discussed in a recent essay), EXCLUDE it.
     4. Ensure every story is grounded in a specific, recent factual event reported in the provided newsletter summaries.
     5. The "title" and "news" MUST reflect a development from the last 7 days, not background context or historical analysis.
-    6. Be extremely selective: prefer 5 high-quality, truly recent stories over 20 mediocre or old ones.
+    6. Be extremely selective: prefer high-quality, truly recent stories over mediocre or old ones.
     7. If a newsletter is an analytical deep dive into Meta's past spending or strategy, DO NOT extract old deals as "Top Stories".
 
     **Recent History Context (Last 30 Days):**
@@ -271,6 +299,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     You MUST respond with ONLY valid JSON. Return an array of JSON objects, where each object has EXACTLY these keys:
     - "title": (string) The subject title.
     - "tag": (string) Either "🟢 [New Break]", "🔵 [Developing]", or "🔴 [Contradiction]".
+    - "tag_reason": (string) One-liner on what it followed or contradicted (if applicable).
     - "news": (string) The concise summary.
     - "impact": (string) The "So What?" impact statement.
 
@@ -279,14 +308,11 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
         
         try:
             resp = self.retry_with_backoff(lambda: self.model.generate_content(prompt))
-            raw_text = resp.text.replace("```json", "").replace("```", "").strip() if resp and resp.text else "[]"
+            raw_text = resp.text if resp and resp.text else "[]"
             
-            # Simple json repair if markdown codeblocks were used incorrectly
-            if not raw_text.startswith("["):
-                raw_text = raw_text[raw_text.find("["):]
-            if not raw_text.endswith("]"):
-                raw_text = raw_text[:raw_text.rfind("]")+1]
-                
+            # Use the new robust JSON repair
+            raw_text = self._repair_json(raw_text)
+            
             top_stories_data = json.loads(raw_text)
             
             if top_stories_data and update_history:
@@ -298,6 +324,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                         'tag': story.get('tag', ''),
                         'news': story.get('news', ''),
                         'impact': story.get('impact', ''),
+                        'tag_reason': story.get('tag_reason', ''),
                         'date': today_iso
                     })
                 
