@@ -33,6 +33,7 @@ RECIPIENT_EMAILS = [
     "karansinghkjs346@gmail.com",
 ]
 
+
 # Logging Setup
 def setup_logging():
     logging.basicConfig(

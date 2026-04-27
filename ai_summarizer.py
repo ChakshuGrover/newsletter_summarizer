@@ -290,7 +290,8 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     4. Ensure every story is grounded in a specific, recent factual event reported in the provided newsletter summaries.
     5. The "title" and "news" MUST reflect a development from the last 7 days, not background context or historical analysis.
     6. Be extremely selective: prefer high-quality, truly recent stories over mediocre or old ones.
-    7. If a newsletter is an analytical deep dive into Meta's past spending or strategy, DO NOT extract old deals as "Top Stories".
+    7. If a newsletter is an analytical deep dive into a company's past strategy, historical deals, or a "looking back" essay, DO NOT extract those events as "Top Stories". Every story MUST be a new factual development reported in the last 7 days.
+    8. VERIFY RECENTNESS: If the text describes an event in the past tense without a specific recent date (e.g., "Last year," "In 2024," "The previously announced deal"), EXCLUDE it. Only include news that is happening NOW.
 
     **Recent History Context (Last 30 Days):**
     {json.dumps(history_context, indent=2)}
