@@ -5,7 +5,7 @@ import argparse
 import sys
 
 from config import (
-    setup_logging, LAST_RUN_FILE, EXPECTED_EMAIL, RECIPIENT_EMAILS
+    setup_logging, LAST_RUN_FILE, EXPECTED_EMAIL, RECIPIENT_EMAILS, ARCHIVE_DIR
 )
 from gmail_manager import (
     get_gmail_service, get_user_email, fetch_newsletter_emails, send_email
@@ -119,6 +119,21 @@ def main():
             sources.append(source_info)
         html_body += ", ".join(sources)
         html_body += "</p>"
+
+        # Archive the email
+        try:
+            if not os.path.exists(ARCHIVE_DIR):
+                os.makedirs(ARCHIVE_DIR)
+            
+            archive_filename = f"digest_{window_end.strftime('%Y-%m-%d')}.html"
+            archive_path = os.path.join(ARCHIVE_DIR, archive_filename)
+            
+            with open(archive_path, 'w') as f:
+                f.write(f"<!-- Subject: {subject} -->\n")
+                f.write(html_body)
+            logging.info(f"Email archived to {archive_path}")
+        except Exception as e:
+            logging.error(f"Failed to archive email: {e}")
 
         # Filter recipients for forced runs
         active_recipients = RECIPIENT_EMAILS

@@ -20,6 +20,7 @@ TOKEN_PICKLE_FILE = 'token.pickle'
 HISTORY_FILE = 'top_stories_history.json'
 LOG_FILE = 'newsletter_summarizer.log'
 LAST_RUN_FILE = 'last_run_date.txt'
+ARCHIVE_DIR = 'archives'
 
 # Gmail Settings
 SCOPES = [
