@@ -43,7 +43,8 @@ class AISummarizer:
 - Try to keep it to 5 to 7 bullet points, capturing only the most significant and impactful information.
 - CRITICAL: Prioritize truly current events and news from the last 7 days. 
 - IGNORE historical recaps, long analytical essays reflecting on old deals, "looking back" sections, or background context unless there is a significant NEW development reported *today*.
-- If you are unsure if a piece of news is recent, err on the side of excluding it."""
+- If you are unsure if a piece of news is recent, err on the side of excluding it.
+- **LINKS**: If a story has a relevant URL provided in brackets [like this], preserve that URL in your summary by making the story title or key phrase a clickable link: `<a href="URL">Title</a>`."""
 
     def _repair_json(self, raw_text):
         """Repair common JSON formatting issues from AI output."""
@@ -161,7 +162,8 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                 summaries.append({
                     'subject': metadata['subject'],
                     'summary_text': summary_text,
-                    'sender': metadata['sender']
+                    'sender': metadata['sender'],
+                    'link': metadata.get('link')
                 })
         
         # Method 2: Try splitting by email numbers (Restored from original)
@@ -187,7 +189,12 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                 
                 metadata = email_metadata[i]
                 if metadata.get('link'): summary_text += f'<br><a href="{metadata["link"]}">Read More</a>'
-                summaries.append({'subject': metadata['subject'], 'summary_text': summary_text, 'sender': metadata['sender']})
+                summaries.append({
+                    'subject': metadata['subject'],
+                    'summary_text': summary_text,
+                    'sender': metadata['sender'],
+                    'link': metadata.get('link')
+                })
 
         return summaries
 
@@ -200,7 +207,12 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                 resp = self.model.generate_content(f"{self.system_prompt}\n\nSummarize:\n{email['body']}")
                 summary = resp.text.replace("```html", "").replace("```", "").strip() if resp and resp.text else ""
                 if email.get('link'): summary += f'<br><a href="{email["link"]}">Read More</a>'
-                summaries.append({'subject': email['subject'], 'summary_text': summary, 'sender': email['sender']})
+                summaries.append({
+                    'subject': email['subject'], 
+                    'summary_text': summary, 
+                    'sender': email['sender'],
+                    'link': email.get('link')
+                })
             except Exception as e:
                 logging.error(f"Error summarizing {email['subject']}: {e}")
         return summaries
@@ -268,7 +280,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
 
         combined = ""
         for i, item in enumerate(summaries):
-            combined += f"Story {i+1}:\nSubject: {item['subject']}\nSender: {item['sender']}\nSummary: {item['summary_text']}\n\n"
+            combined += f"Story {i+1}:\nSubject: {item['subject']}\nSender: {item['sender']}\nLink: {item.get('link', '')}\nSummary: {item['summary_text']}\n\n"
 
         prompt = f"""From the following newsletter summaries, identify the top AI & Tech stories (maximum 30).
     
@@ -281,7 +293,8 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     3. Ignore stories that are merely repetitions of history without significant updates.
     4. Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
     5. For 🔵 [Developing] or 🔴 [Contradiction] stories, provide a ONE-LINE "Tag Reason" that explains exactly what it follows or contradicts from the history. If it is 🟢 [New Break], leave it empty.
-    6. UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
+    6. SOURCE URL: For every story, extract the most relevant URL from the summary. If multiple links exist, choose the most direct one (e.g., a news article link). If no specific link is found in the summary, use the "Link" provided for that newsletter source.
+    7. UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
     
     **CRITICAL RECENTNESS & GROUNDING RULES:**
     1. ONLY identify stories that are reported as NEW or DEVELOPING breaking news within the provided summaries.
@@ -303,6 +316,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     - "tag_reason": (string) One-liner on what it followed or contradicted (if applicable).
     - "news": (string) The concise summary.
     - "impact": (string) The "So What?" impact statement.
+    - "source_url": (string) The most relevant link found for this story.
 
     Newsletter Summaries:
     {combined}"""
@@ -326,6 +340,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                         'news': story.get('news', ''),
                         'impact': story.get('impact', ''),
                         'tag_reason': story.get('tag_reason', ''),
+                        'source_url': story.get('source_url', ''),
                         'date': today_iso
                     })
                 

@@ -21,7 +21,7 @@ from google.auth import exceptions
 from bs4 import BeautifulSoup, Comment
 
 from config import SECRET_FILE, TOKEN_PICKLE_FILE, SCOPES
-from utils import find_article_link
+from utils import find_article_link, sanitize_url
 
 def get_gmail_service():
     logging.info("Entering get_gmail_service")
@@ -184,12 +184,27 @@ def fetch_newsletter_emails(service, window_start, window_end):
             article_link = None
             if html_body:
                 soup = BeautifulSoup(html_body, 'html.parser')
-                for element in soup(["script", "style", "header", "footer", "nav", "aside", "form"]):
+
+                # FIRST: Find the primary article link while soup is completely intact (including <head>)
+                article_link = find_article_link(soup)
+
+                for element in soup(["script", "style", "header", "footer", "nav", "aside", "form", "head", "meta", "link"]):
                     element.decompose()
                 for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
                     comment.extract()
+
+                # SECOND: Preserve relevant links as text markers for the AI
+                for a in soup.find_all('a', href=True):
+                    href = sanitize_url(a.get('href'))
+                    text = a.get_text(strip=True)
+                    if not text or not href.startswith('http'):
+                        continue
+                    # Skip social and utility links
+                    if any(x in href.lower() for x in ['facebook.com', 'twitter.com', 'linkedin.com', 'instagram.com', 'unsubscribe', 'preferences', 'browser']):
+                        continue
+                    a.replace_with(f"{text} [{href}]")
+
                 message_body = soup.get_text(separator=' ', strip=True)
-                article_link = find_article_link(soup)
             elif plain_body:
                 message_body = plain_body
             
@@ -197,9 +212,12 @@ def fetch_newsletter_emails(service, window_start, window_end):
                 subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), '')
                 from_h = next((h['value'] for h in headers if h['name'].lower() == 'from'), '')
                 sender_name, _ = parseaddr(from_h)
-                
-                filtered_emails.append({
-                    'id': message['id'],
+
+                # TLDR emails are summaries, not individual articles, so they shouldn't have a newsletter-level link
+                if 'TLDR' in sender_name:
+                    article_link = None
+
+                filtered_emails.append({                    'id': message['id'],
                     'subject': subject,
                     'sender': sender_name or 'Unknown Sender',
                     'date': date_obj.strftime('%Y-%m-%d %H:%M:%S %Z'),

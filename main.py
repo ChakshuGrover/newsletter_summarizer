@@ -91,7 +91,12 @@ def main():
         else:
             for i, story in enumerate(top_stories_data):
                 tag_str = story.get('tag', '')
-                html_body += f"<h3>{i+1}. {story.get('title', 'Unknown')} {tag_str}</h3>"
+                source_url = story.get('source_url', '')
+                title_html = f"{i+1}. {story.get('title', 'Unknown')} {tag_str}"
+                if source_url:
+                    title_html = f"<a href='{source_url}' style='text-decoration: none; color: inherit;'>{title_html}</a>"
+                
+                html_body += f"<h3>{title_html}</h3>"
                 
                 # Contrarian Take for top 5 stories
                 tag_reason = story.get('tag_reason', '')
@@ -116,6 +121,8 @@ def main():
         sources = []
         for s in summaries:
             source_info = f"{s['sender']} ({s['subject']})"
+            if s.get('link'):
+                source_info = f"<a href='{s['link']}' style='color: #777;'>{source_info}</a>"
             sources.append(source_info)
         html_body += ", ".join(sources)
         html_body += "</p>"

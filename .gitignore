@@ -22,3 +22,7 @@ top_stories_history.json
 # Logs
 *.log
 *.err
+
+# Outputs & System Files
+archives/
+.DS_Store
