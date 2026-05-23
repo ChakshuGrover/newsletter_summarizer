@@ -12,16 +12,17 @@ from gmail_manager import (
     get_gmail_service, get_user_email, fetch_newsletter_emails, send_email
 )
 from ai_summarizer import AISummarizer
+from digest_layout import render_themed_stories
 from notifier import send_telegram_message
 
 def get_tag_badge(tag):
     tag = tag.strip().upper()
     if 'NEW BREAK' in tag:
-        return '<span style="display: inline-block; padding: 4px 10px; font-size: 10px; font-weight: 800; border-radius: 4px; border: 2px solid #1E293B; background-color: #A7E4CB; color: #1E293B; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; margin-left: 8px;">New Break</span>'
-    elif 'DEVELOPING' in tag:
-        return '<span style="display: inline-block; padding: 4px 10px; font-size: 10px; font-weight: 800; border-radius: 4px; border: 2px solid #1E293B; background-color: #9ACBF7; color: #1E293B; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; margin-left: 8px;">Developing</span>'
-    elif 'CONTRADICTION' in tag:
-        return '<span style="display: inline-block; padding: 4px 10px; font-size: 10px; font-weight: 800; border-radius: 4px; border: 2px solid #1E293B; background-color: #FAAA9C; color: #1E293B; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; margin-left: 8px;">Contradiction</span>'
+        return '<span class="pill pill--new-break">New Break</span>'
+    if 'DEVELOPING' in tag:
+        return '<span class="pill pill--developing">Developing</span>'
+    if 'CONTRADICTION' in tag:
+        return '<span class="pill pill--contradiction">Contradiction</span>'
     return ''
 
 
@@ -84,7 +85,7 @@ def main():
     if summaries:
         # 5. Generate Insights and Digest
         date_range_str = f"{window_start.strftime('%b %d')} - {window_end.strftime('%b %d, %Y')}"
-        subject = f"AI & Tech Newsletters Daily Digest - {date_range_str}"
+        subject = f"AI & Tech Newsletters Digest - {date_range_str}"
         
         logging.info("Sleeping for 60 seconds to reset Token Per Minute (TPM) quota...")
         time.sleep(60)
@@ -155,19 +156,55 @@ def main():
     .content {{
       padding: 35px 30px;
     }}
-    .section-title {{
-      font-size: 11px;
+    .pill {{
+      display: inline-block;
+      font-size: 10px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.12em;
-      background-color: #D35F47; /* Elegant Muted Terracotta */
-      color: #ffffff;
+      letter-spacing: 0.05em;
+      line-height: 1.25;
       border: 2px solid #1E293B;
-      padding: 6px 14px;
-      display: inline-block;
-      box-shadow: 3px 3px 0px #1E293B;
-      margin-bottom: 25px;
       border-radius: 4px;
+      padding: 4px 10px;
+      box-shadow: 3px 3px 0px #1E293B;
+      color: #1E293B;
+      vertical-align: middle;
+    }}
+    .pill--macro {{
+      background-color: #D35F47;
+      color: #ffffff;
+    }}
+    .pill--new-break {{
+      background-color: #A7E4CB;
+    }}
+    .pill--developing {{
+      background-color: #9ACBF7;
+    }}
+    .pill--contradiction {{
+      background-color: #FAAA9C;
+    }}
+    .pill--capital {{
+      background-color: #FDE68A;
+      color: #92400E;
+    }}
+    .pill--products {{
+      background-color: #DDD6FE;
+      color: #5B21B6;
+    }}
+    .pill--infrastructure {{
+      background-color: #D1FAE5;
+      color: #065F46;
+    }}
+    .pill--industry {{
+      background-color: #E2E8F0;
+      color: #334155;
+    }}
+    .section-title {{
+      margin-top: 32px;
+      margin-bottom: 22px;
+    }}
+    .section-title:first-of-type {{
+      margin-top: 0;
     }}
     .commentary-card {{
       background-color: #FCF9F3; /* Light Warm Sand */
@@ -192,20 +229,33 @@ def main():
       box-shadow: 4px 4px 0px #1E293B;
       background-color: #ffffff;
     }}
+    .nugget-card {{
+      background-color: #FCF9F3;
+      box-shadow: 3px 3px 0px #1E293B;
+    }}
     .story-title {{
+      margin: 0 0 14px 0;
+    }}
+    .story-title-text {{
       font-size: 18px;
       font-weight: 800;
       line-height: 1.4;
-      margin: 0 0 14px 0;
+      margin: 0 0 10px 0;
     }}
-    .story-title a {{
+    .story-title-badges {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }}
+    .story-title-text a {{
       color: #1E293B;
       text-decoration: underline;
       text-decoration-thickness: 2px;
       text-underline-offset: 3px;
       transition: all 0.2s ease;
     }}
-    .story-title a:hover {{
+    .story-title-text a:hover {{
       color: #D35F47;
       text-decoration-color: #D35F47;
     }}
@@ -287,7 +337,7 @@ def main():
   <div class="wrapper">
     <div class="container">
       <div class="header">
-        <p>Your Daily Tech Intelligence</p>
+        <p>Your AI &amp; Tech Newsletter Brief</p>
         <h1>AI & Tech Digest</h1>
         <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #1E293B; opacity: 0.85; margin-top: 6px;">{date_range_str}</p>
       </div>
@@ -297,48 +347,14 @@ def main():
 
         if commentary:
             html_body += f"""
-        <div class="section-title">Macro Landscape Commentary</div>
+        <div class="section-title pill pill--macro">Macro Landscape Commentary</div>
         <div class="commentary-card">
           <p class="commentary-text">"{commentary}"</p>
         </div>
 """
         
-        html_body += f'<div class="section-title">Top AI & Tech Stories</div>'
-        if not top_stories_data:
-            html_body += "<p style='color: #64748b; font-size: 14px;'>No top stories found.</p>"
-        else:
-            for i, story in enumerate(top_stories_data):
-                tag_str = story.get('tag', '')
-                badge_html = get_tag_badge(tag_str)
-                source_url = story.get('source_url', '')
-                
-                title_text = f"{i+1}. {story.get('title', 'Unknown')}"
-                if source_url:
-                    title_html = f"<a href='{source_url}'>{title_text}</a>"
-                else:
-                    title_html = title_text
-                
-                html_body += f"""
-        <div class="story-card">
-          <div class="story-title">
-            {title_html}
-            {badge_html}
-          </div>
-"""
-                
-                tag_reason = story.get('tag_reason', '')
-                contrarian_take = story.get('contrarian_take', '')
-                
-                html_body += f"""
-          <p class="story-body"><b>The News:</b> {story.get('news', '')}</p>
-          <p class="story-body"><b>The Impact:</b> {story.get('impact', '')}</p>
-"""
-                if tag_reason:
-                    html_body += f'          <div class="story-context">Context: {tag_reason}</div>'
-                if contrarian_take:
-                    html_body += f'          <div class="contrarian-bullet"><b>Skeptic\'s Take:</b> {contrarian_take}</div>'
-                
-                html_body += '        </div>'
+        stories_html, _ = render_themed_stories(top_stories_data, get_tag_badge)
+        html_body += stories_html
 
             
         # Sources Scanned
@@ -359,7 +375,7 @@ def main():
           </div>
         </div>
         <p style="margin-top: 30px; font-size: 11px; color: #475569;">
-          You are receiving this because you subscribed to the AI & Tech Newsletters Daily Digest.<br>
+          You are receiving this because you subscribed to the AI &amp; Tech Newsletters Digest.<br>
           ChakshuGrover/newsletter_summarizer &copy; 2026. All rights reserved.
         </p>
       </div>

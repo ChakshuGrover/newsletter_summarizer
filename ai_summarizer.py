@@ -8,6 +8,7 @@ from collections import deque
 import google.generativeai as genai
 from bs4 import BeautifulSoup
 from config import API_KEYS, HISTORY_FILE
+from digest_layout import normalize_category, normalize_tier
 
 class RateLimiter:
     def __init__(self, rate_limit_per_minute):
@@ -292,6 +293,18 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     6. SOURCE NEWSLETTER: For every story, identify the specific newsletter summary it was extracted from (represented as 'Story 1', 'Story 2', etc. in the list below).
     7. CONTRARIAN TAKE: For every story, act as a sharp, highly analytical tech skeptic and generate a single-sentence 'Contrarian Take' or 'Devil's Advocate' perspective that highlights potential risks, overhyped aspects, or hidden downsides.
     8. UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
+    9. STORY TIER: Assign each story exactly one tier:
+       - "headline": The 5–7 most important stories of the period (major industry shifts, landmark deals, flagship model launches). Use sparingly.
+       - "standard": Significant stories that belong in a themed section below.
+       - "nugget": Smaller but useful items (niche tool launches, minor feature updates, single data points). Aim for 5–10 nuggets when available.
+    10. CATEGORY: Assign each story exactly one primary category (use these exact snake_case values):
+       - "capital": Funding rounds, valuations, M&A, IPO/S-1 filings, major partnerships with dollar figures, and public-company financial news (quarterly earnings, revenue beats/misses, guidance, investor-day targets, secondary offerings).
+       - "products": Model launches and updates, benchmarks, papers, safety/interpretability research, shipped features, GA product releases, integrations, developer tools, and landmark researcher or lab-lead hires tied to model building (e.g. joins pretraining team). Prefer "products" over "industry" for technical talent moves.
+       - "infrastructure": Data centers, chips/TPUs/GPUs/CPUs, energy/grid, cloud capacity, compute architecture, hardware roadmaps.
+       - "industry": Layoffs, hiring freezes, reorgs, C-suite or business/operations leadership moves, regulation, lawsuits, military/government contracts, privacy, and security breaches. Do NOT use "industry" for earnings, revenue, IPO/filing news, or core R&D hires—use "capital" or "products" instead.
+       Category tie-breakers: (a) earnings + product launch in one newsletter → split into two stories (see rule 11); (b) chip earnings alone → "capital"; (c) new silicon/CPU/GPU announcement alone → "infrastructure"; (d) famous researcher joins training/R&D team → "products"; (e) CEO/CFO/COO or mass layoffs → "industry".
+    11. SPLIT COMBINED STORIES: When a newsletter summary clearly contains two distinct beats (e.g., "record Q1 earnings" AND "unveils new Vera CPU"), emit TWO separate JSON objects—one per beat—each with its own title, category, tier, and importance_rank. Do not merge unrelated developments into one card. Both items may share the same source_newsletter_index. Splits count toward the maximum of 30 stories.
+    12. IMPORTANCE_RANK: Integer 1–30 where 1 is the single most important story in this digest. Headlines should be ranks 1–7. Nuggets should be ranks 20–30.
     
     **CRITICAL RECENTNESS & GROUNDING RULES:**
     1. ONLY identify stories that are reported as NEW or DEVELOPING breaking news within the provided summaries.
@@ -315,6 +328,9 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     - "impact": (string) The "So What?" impact statement.
     - "source_newsletter_index": (integer) The 1-based index of the newsletter summary where this story was found (e.g., 1 for Story 1, 2 for Story 2, etc.).
     - "contrarian_take": (string) The single-sentence contrarian take or skeptical perspective.
+    - "tier": (string) Exactly one of: "headline", "standard", "nugget".
+    - "category": (string) Exactly one of: "capital", "products", "infrastructure", "industry".
+    - "importance_rank": (integer) Importance rank 1–30 within this digest.
 
     Newsletter Summaries:
     {combined}"""
@@ -336,6 +352,8 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
             
             if top_stories_data:
                 for story in top_stories_data:
+                    story['tier'] = normalize_tier(story.get('tier'))
+                    story['category'] = normalize_category(story.get('category'))
                     idx = story.get('source_newsletter_index')
                     if idx is not None:
                         try:
@@ -360,6 +378,8 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
                         'tag_reason': story.get('tag_reason', ''),
                         'source_url': story.get('source_url', ''),
                         'contrarian_take': story.get('contrarian_take', ''),
+                        'tier': story.get('tier', 'standard'),
+                        'category': story.get('category', 'products'),
                         'date': logical_date
                     })
                 
