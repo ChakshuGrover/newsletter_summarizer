@@ -79,30 +79,33 @@ class AISummarizer:
             except Exception as e:
                 error_str = str(e).lower()
                 if any(x in error_str for x in ["429", "quota", "rate limit"]):
-                    logging.warning(f"Rate limit hit on key index {self.current_key_index}.")
+                    logging.warning(f"Rate limit hit on key index {self.current_key_index}: {e}")
                     
                     if len(API_KEYS) > 1:
                         self.current_key_index = (self.current_key_index + 1) % len(API_KEYS)
+                        logging.info(f"Rotating to API key index {self.current_key_index}...")
                         genai.configure(api_key=API_KEYS[self.current_key_index])
-                        logging.info(f"Switching to API key index {self.current_key_index}...")
+                        # CRITICAL FIX: Re-instantiate the model so it binds to the new active key
+                        self.model = genai.GenerativeModel('gemini-3.5-flash')
+                        
                         try:
+                            logging.info("Retrying immediately with the new rotated key...")
                             return func()
-                        except Exception:
-                            pass
+                        except Exception as retry_err:
+                            logging.warning(f"Immediate retry on rotated key index {self.current_key_index} failed: {retry_err}")
                     
                     if attempt < max_retries - 1:
                         delay = initial_delay * (2 ** attempt)
-                        # Optimization from original: parse "retry in X" if available
                         match = re.search(r'retry in ([\d.]+)s', error_str)
                         if match:
                             delay = float(match.group(1)) + 1
                         
-                        logging.warning(f"Retrying in {delay:.1f} seconds...")
+                        logging.warning(f"Sleeping for {delay:.1f} seconds before next retry...")
                         time.sleep(delay)
                         continue
                 raise e
 
-    def summarize_emails(self, filtered_emails, chunk_size=20):
+    def summarize_emails(self, filtered_emails, chunk_size=10):
         if not filtered_emails:
             return []
         
