@@ -32,6 +32,8 @@ EXPECTED_EMAIL = "chakshugrover.newsletters@gmail.com"
 RECIPIENT_EMAILS = [
     "chakshu.grover8@gmail.com",
     "karansinghkjs346@gmail.com",
+    "shah.harshil1102@gmail.com",
+    "anjistic@gmail.com",
 ]
 
 
