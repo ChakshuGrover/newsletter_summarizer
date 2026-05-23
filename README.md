@@ -5,7 +5,7 @@ An automated tool that curates, summarizes, and digests AI and tech newsletters 
 ## Features
 
 - **Smart Filtering**: Automatically fetches emails with the `ai-newsletters` label from Gmail.
-- **AI-Powered Summarization**: Uses Google's Gemini API (`gemini-2.0-flash`) to generate concise, bulleted summaries of each newsletter.
+- **AI-Powered Summarization**: Uses Google's Gemini API (`gemini-3.5-flash`) to generate concise, bulleted summaries of each newsletter.
 - **Daily Digest**: Compiles all summaries into a single, well-formatted HTML email and sends it to a designated recipient.
 - **LinkedIn Content Generation**: Automatically drafts three different styles of LinkedIn posts based on the daily news.
 - **Telegram Integration**: Delivers the LinkedIn post drafts directly to your Telegram for easy copy-pasting.
