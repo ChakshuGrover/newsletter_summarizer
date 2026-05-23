@@ -26,3 +26,10 @@ top_stories_history.json
 # Outputs & System Files
 archives/
 .DS_Store
+
+# Agent & CLI internal files
+.agent/
+.antigravitycli/
+scratch/
+ui-ux-pro-max-skill/
+

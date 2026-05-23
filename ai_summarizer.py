@@ -102,21 +102,29 @@ class AISummarizer:
                         continue
                 raise e
 
-    def summarize_emails(self, filtered_emails):
+    def summarize_emails(self, filtered_emails, chunk_size=20):
         if not filtered_emails:
             return []
         
-        email_metadata = []
-        emails_text = ""
-        for i, email in enumerate(filtered_emails):
-            email_metadata.append({
-                'subject': email['subject'], 
-                'sender': email['sender'], 
-                'link': email.get('link')
-            })
-            emails_text += f"\n--- Email {i+1} ---\nSubject: {email['subject']}\nFrom: {email['sender']}\nDate: {email.get('date', 'Unknown')}\nContent:\n{email['body']}\n---\n"
+        all_summaries = []
+        total_emails = len(filtered_emails)
+        logging.info(f"Summarizing {total_emails} emails in chunks of {chunk_size}...")
+        
+        for chunk_idx in range(0, total_emails, chunk_size):
+            chunk = filtered_emails[chunk_idx : chunk_idx + chunk_size]
+            logging.info(f"Processing chunk {chunk_idx // chunk_size + 1}/{(total_emails - 1) // chunk_size + 1} ({len(chunk)} emails)...")
+            
+            email_metadata = []
+            emails_text = ""
+            for i, email in enumerate(chunk):
+                email_metadata.append({
+                    'subject': email['subject'], 
+                    'sender': email['sender'], 
+                    'link': email.get('link')
+                })
+                emails_text += f"\n--- Email {i+1} ---\nSubject: {email['subject']}\nFrom: {email['sender']}\nDate: {email.get('date', 'Unknown')}\nContent:\n{email['body']}\n---\n"
 
-        batch_prompt = f"""{self.system_prompt}
+            batch_prompt = f"""{self.system_prompt}
 
 Please summarize each of the following newsletters. Format your response as follows:
 
@@ -130,17 +138,29 @@ EMAIL_END
 Here are the newsletters to summarize:
 {emails_text}
 
-Please provide summaries for all {len(filtered_emails)} emails in the format specified above."""
-        
-        try:
-            logging.info("Sending batch summarization request to Gemini API...")
-            response = self.retry_with_backoff(lambda: self.model.generate_content(batch_prompt))
-            if not response or not response.text:
-                return []
-            return self._parse_batch_summaries(response.text, email_metadata)
-        except Exception as e:
-            logging.error(f"Error in batch summarization: {e}. Falling back to individual.")
-            return self._summarize_individually(filtered_emails)
+Please provide summaries for all {len(chunk)} emails in the format specified above."""
+            
+            try:
+                response = self.retry_with_backoff(
+                    lambda: self.model.generate_content(
+                        batch_prompt, 
+                        generation_config={"temperature": 0.0}
+                    )
+                )
+                if not response or not response.text:
+                    logging.error(f"Empty response received for chunk starting at index {chunk_idx}.")
+                    continue
+                
+                chunk_summaries = self._parse_batch_summaries(response.text, email_metadata)
+                if not chunk_summaries:
+                    logging.warning(f"No summaries were parsed for chunk starting at index {chunk_idx}!")
+                    logging.warning(f"Raw response (first 1000 chars): {response.text[:1000]}")
+                else:
+                    all_summaries.extend(chunk_summaries)
+            except Exception as e:
+                logging.error(f"Error in chunk summarization (index {chunk_idx}): {e}")
+                
+        return all_summaries
 
     def _parse_batch_summaries(self, response_text, email_metadata):
         summaries = []
@@ -198,25 +218,6 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
 
         return summaries
 
-    def _summarize_individually(self, emails):
-        summaries = []
-        limiter = RateLimiter(4)
-        for email in emails:
-            try:
-                limiter.wait_for_permission()
-                resp = self.model.generate_content(f"{self.system_prompt}\n\nSummarize:\n{email['body']}")
-                summary = resp.text.replace("```html", "").replace("```", "").strip() if resp and resp.text else ""
-                if email.get('link'): summary += f'<br><a href="{email["link"]}">Read More</a>'
-                summaries.append({
-                    'subject': email['subject'], 
-                    'summary_text': summary, 
-                    'sender': email['sender'],
-                    'link': email.get('link')
-                })
-            except Exception as e:
-                logging.error(f"Error summarizing {email['subject']}: {e}")
-        return summaries
-
     def generate_landscape_commentary(self, summaries):
         if not summaries:
             return ""
@@ -238,27 +239,16 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
         {combined}"""
         
         try:
-            resp = self.retry_with_backoff(lambda: self.model.generate_content(prompt))
+            resp = self.retry_with_backoff(
+                lambda: self.model.generate_content(
+                    prompt, 
+                    generation_config={"temperature": 0.3}
+                )
+            )
             return resp.text.strip() if resp and resp.text else ""
+
         except Exception as e:
             logging.error(f"Error generating commentary: {e}")
-            return ""
-
-    def generate_contrarian_take(self, top_story):
-        if not top_story:
-            return ""
-            
-        prompt = f"""Act as a sharp, highly analytical tech skeptic. Given the following major news story, provide a single-sentence 'Contrarian Take' or 'Devil's Advocate' perspective that highlights potential risks, overhyped aspects, or hidden downsides.
-        
-        Story Title: {top_story.get('title', '')}
-        Story News: {top_story.get('news', '')}
-        """
-        
-        try:
-            resp = self.retry_with_backoff(lambda: self.model.generate_content(prompt))
-            return resp.text.strip() if resp and resp.text else ""
-        except Exception as e:
-            logging.error(f"Error generating contrarian take: {e}")
             return ""
 
     def get_top_stories(self, summaries, update_history=True):
@@ -294,7 +284,8 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     4. Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
     5. For 🔵 [Developing] or 🔴 [Contradiction] stories, provide a ONE-LINE "Tag Reason" that explains exactly what it follows or contradicts from the history. If it is 🟢 [New Break], leave it empty.
     6. SOURCE NEWSLETTER: For every story, identify the specific newsletter summary it was extracted from (represented as 'Story 1', 'Story 2', etc. in the list below).
-    7. UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
+    7. CONTRARIAN TAKE: For every story, act as a sharp, highly analytical tech skeptic and generate a single-sentence 'Contrarian Take' or 'Devil's Advocate' perspective that highlights potential risks, overhyped aspects, or hidden downsides.
+    8. UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
     
     **CRITICAL RECENTNESS & GROUNDING RULES:**
     1. ONLY identify stories that are reported as NEW or DEVELOPING breaking news within the provided summaries.
@@ -317,12 +308,19 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     - "news": (string) The concise summary.
     - "impact": (string) The "So What?" impact statement.
     - "source_newsletter_index": (integer) The 1-based index of the newsletter summary where this story was found (e.g., 1 for Story 1, 2 for Story 2, etc.).
+    - "contrarian_take": (string) The single-sentence contrarian take or skeptical perspective.
 
     Newsletter Summaries:
     {combined}"""
         
         try:
-            resp = self.retry_with_backoff(lambda: self.model.generate_content(prompt))
+            resp = self.retry_with_backoff(
+                lambda: self.model.generate_content(
+                    prompt, 
+                    generation_config={"temperature": 0.0}
+                )
+            )
+
             raw_text = resp.text if resp and resp.text else "[]"
             
             # Use the new robust JSON repair
@@ -356,6 +354,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
                         'impact': story.get('impact', ''),
                         'tag_reason': story.get('tag_reason', ''),
                         'source_url': story.get('source_url', ''),
+                        'contrarian_take': story.get('contrarian_take', ''),
                         'date': today_iso
                     })
                 
@@ -399,8 +398,14 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     {combined}"""
         
         try:
-            resp = self.retry_with_backoff(lambda: self.model.generate_content(prompt))
+            resp = self.retry_with_backoff(
+                lambda: self.model.generate_content(
+                    prompt, 
+                    generation_config={"temperature": 0.5}
+                )
+            )
             if not resp or not resp.text: return []
+
             return [p.strip() for p in resp.text.split("|||POST_SEPARATOR|||") if p.strip()]
         except Exception as e:
             logging.error(f"Error generating LinkedIn posts: {e}")

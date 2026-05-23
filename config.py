@@ -7,9 +7,11 @@ env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=env_path, override=True)
 
 # API Keys
-GEMINI_API_KEY_1 = os.getenv("GEMINI_API_KEY")
-GEMINI_API_KEY_2 = os.getenv("GEMINI_API_KEY_2")
-API_KEYS = [key for key in [GEMINI_API_KEY_1, GEMINI_API_KEY_2] if key]
+API_KEYS = []
+# Automatically load GEMINI_API_KEY and any additional GEMINI_API_KEY_X variables in sorted order
+for key, value in sorted(os.environ.items()):
+    if key.startswith("GEMINI_API_KEY") and value:
+        API_KEYS.append(value)
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
