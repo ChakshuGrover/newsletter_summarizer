@@ -96,7 +96,7 @@ def main():
         time.sleep(15)
         
         logging.info("Extracting top stories and generating contrarian take...")
-        top_stories_data = summarizer.get_top_stories(summaries, update_history=not args.force)
+        top_stories_data = summarizer.get_top_stories(summaries, update_history=not args.force, target_date=target_date_str)
         
         html_body = f"""<!DOCTYPE html>
 <html>

@@ -254,11 +254,14 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
             logging.error(f"Error generating commentary: {e}")
             return ""
 
-    def get_top_stories(self, summaries, update_history=True):
+    def get_top_stories(self, summaries, update_history=True, target_date=None):
         history = []
         # Extended window to 30 days for better "Story Arc" tracking
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=30)).isoformat()
-        today_prefix = datetime.datetime.now().isoformat()[:10]
+        
+        # Determine the logical date of this run
+        logical_date = target_date if target_date else datetime.datetime.now().isoformat()
+        logical_day_prefix = logical_date[:10]
         
         if os.path.exists(HISTORY_FILE):
             try:
@@ -267,8 +270,8 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
             except json.JSONDecodeError:
                 history = []
         
-        # Filter history to only include the last 30 days, excluding today (to avoid feedback loops)
-        active_history = [item for item in history if item.get('date', '') > cutoff and not item.get('date', '').startswith(today_prefix)]
+        # Filter history to only include the last 30 days, excluding the current logical run day (to avoid feedback loops)
+        active_history = [item for item in history if item.get('date', '') > cutoff and not item.get('date', '').startswith(logical_day_prefix)]
         history_context = [{"title": item.get('title', item.get('subject', '')), "impact": item.get('impact', item.get('reason', ''))} for item in active_history]
 
         combined = ""
@@ -347,7 +350,6 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
                         story['source_url'] = ""
             
             if top_stories_data and update_history:
-                today_iso = datetime.datetime.now().isoformat()
                 new_entries = []
                 for story in top_stories_data:
                     new_entries.append({
@@ -358,7 +360,7 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
                         'tag_reason': story.get('tag_reason', ''),
                         'source_url': story.get('source_url', ''),
                         'contrarian_take': story.get('contrarian_take', ''),
-                        'date': today_iso
+                        'date': logical_date
                     })
                 
                 # Save only the active 30-day window + new entries to disk
