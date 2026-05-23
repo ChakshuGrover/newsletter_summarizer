@@ -293,7 +293,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     3. Ignore stories that are merely repetitions of history without significant updates.
     4. Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
     5. For 🔵 [Developing] or 🔴 [Contradiction] stories, provide a ONE-LINE "Tag Reason" that explains exactly what it follows or contradicts from the history. If it is 🟢 [New Break], leave it empty.
-    6. SOURCE URL: For every story, extract the most relevant URL from the summary. If multiple links exist, choose the most direct one (e.g., a news article link). If no specific link is found in the summary, use the "Link" provided for that newsletter source.
+    6. SOURCE NEWSLETTER: For every story, identify the specific newsletter summary it was extracted from (represented as 'Story 1', 'Story 2', etc. in the list below).
     7. UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
     
     **CRITICAL RECENTNESS & GROUNDING RULES:**
@@ -316,7 +316,7 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
     - "tag_reason": (string) One-liner on what it followed or contradicted (if applicable).
     - "news": (string) The concise summary.
     - "impact": (string) The "So What?" impact statement.
-    - "source_url": (string) The most relevant link found for this story.
+    - "source_newsletter_index": (integer) The 1-based index of the newsletter summary where this story was found (e.g., 1 for Story 1, 2 for Story 2, etc.).
 
     Newsletter Summaries:
     {combined}"""
@@ -329,6 +329,21 @@ Please provide summaries for all {len(filtered_emails)} emails in the format spe
             raw_text = self._repair_json(raw_text)
             
             top_stories_data = json.loads(raw_text)
+            
+            if top_stories_data:
+                for story in top_stories_data:
+                    idx = story.get('source_newsletter_index')
+                    if idx is not None:
+                        try:
+                            idx = int(idx)
+                            if 1 <= idx <= len(summaries):
+                                story['source_url'] = summaries[idx - 1].get('link') or ""
+                            else:
+                                story['source_url'] = ""
+                        except (ValueError, TypeError):
+                            story['source_url'] = ""
+                    else:
+                        story['source_url'] = ""
             
             if top_stories_data and update_history:
                 today_iso = datetime.datetime.now().isoformat()
