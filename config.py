@@ -36,7 +36,10 @@ RECIPIENT_EMAILS = [
     "karansinghkjs346@gmail.com",
     "shah.harshil1102@gmail.com",
     "anjistic@gmail.com",
+    "Vipin.kgp21@gmail.com",
 ]
+REPLY_TO_EMAIL = "chakshu.grover8@gmail.com"
+
 
 
 # Logging Setup

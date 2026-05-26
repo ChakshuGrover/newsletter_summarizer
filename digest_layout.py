@@ -226,7 +226,7 @@ def render_themed_stories(stories, get_tag_badge):
     counter = 0
 
     for section_id, section_label, section_stories in sections:
-        compact = section_id == "nuggets"
+        compact = False
         show_category = section_id == "headlines"
         html_parts.append(render_section_title(section_id, section_label))
         for story in section_stories:

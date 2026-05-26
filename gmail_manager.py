@@ -122,7 +122,7 @@ def get_user_email(service):
         logging.error(f"Error getting user email: {e}")
         return None
 
-def send_email(service, to, subject, html_body):
+def send_email(service, to, subject, html_body, bcc=None, reply_to=None):
     user_email = get_user_email(service)
     if not user_email:
         logging.error("Could not determine user's email address. Sending cancelled.")
@@ -132,6 +132,10 @@ def send_email(service, to, subject, html_body):
     message['to'] = to
     message['From'] = user_email
     message['subject'] = subject
+    if bcc:
+        message['Bcc'] = bcc
+    if reply_to:
+        message['Reply-To'] = reply_to
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     
     try:

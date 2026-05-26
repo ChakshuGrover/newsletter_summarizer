@@ -6,7 +6,7 @@ import sys
 import time
 
 from config import (
-    setup_logging, LAST_RUN_FILE, EXPECTED_EMAIL, RECIPIENT_EMAILS, ARCHIVE_DIR
+    setup_logging, LAST_RUN_FILE, EXPECTED_EMAIL, RECIPIENT_EMAILS, ARCHIVE_DIR, REPLY_TO_EMAIL
 )
 from gmail_manager import (
     get_gmail_service, get_user_email, fetch_newsletter_emails, send_email
@@ -406,9 +406,16 @@ def main():
             active_recipients = ["chakshu.grover8@gmail.com"]
             logging.info(f"Forced run detected. Overriding recipients to: {active_recipients}")
 
-        to_list = ", ".join(active_recipients)
-        logging.info(f"Sending digest email to {to_list}")
-        send_email(service, to_list, subject, html_body)
+        bcc_list = ", ".join(active_recipients)
+        logging.info(f"Sending digest email. To: {user_email}, BCC: {bcc_list}, Reply-To: {REPLY_TO_EMAIL}")
+        send_email(
+            service=service,
+            to=user_email,
+            subject=subject,
+            html_body=html_body,
+            bcc=bcc_list,
+            reply_to=REPLY_TO_EMAIL
+        )
 
         # 6. LinkedIn & Telegram (Disabled for now)
         # linkedin_posts = summarizer.generate_linkedin_posts(summaries)
