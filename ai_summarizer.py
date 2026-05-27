@@ -230,23 +230,29 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
         for i, item in enumerate(summaries):
             combined += f"Subject: {item['subject']}\nSummary: {item['summary_text']}\n\n"
             
-        prompt = f"""Act as a high-level technology analyst and ghostwriter. Analyze the following AI and Tech newsletter summaries and provide a single, punchy paragraph (maximum 5 sentences) that captures the overarching progression and 'vibe' of the industry over the last few days.
-        
-        CRITICAL REQUIREMENTS:
-        - Output ONLY the paragraph in PLAIN TEXT.
-        - DO NOT use any Markdown (no bolding, no headers like ###, no bullet points, no **).
-        - DO NOT include ANY introductory or concluding conversational filler. 
-        - DO NOT start with phrases like "Based on the summaries provided..." or "Here is an analysis...". Start immediately with the analysis.
-        - Focus on a high-level synthesis: Connect the dots between different news items rather than just listing them.
-        
-        Newsletter Summaries:
-        {combined}"""
+        prompt = f"""Act as a world-class technology analyst, venture capitalist, and chief storyteller writing with the narrative flair of Wired, the sharp-witted clarity of Stratechery, and the editorial precision of The Economist.
+
+Analyze the following AI and Tech newsletter summaries and provide a single, punchy paragraph (maximum 5 sentences) that synthesizes the overarching narrative and 'vibe' of the industry over the last few days.
+
+CRITICAL CONTENT & CREATIVITY REQUIREMENTS:
+- HOOK WITH TECH & CAPABILITIES: Start immediately with a dynamic, specific opening hook focused on the latest technological breakthroughs, new product/model launches, or what is now possible with AI. Do NOT start with corporate drama, layoffs, or funding rounds; keep the focus on technology and capability first, integrating business context only as secondary support.
+- BANNED CLICHÉS: Strictly forbid the standard, repetitive opening formulas. Do NOT start with phrases like:
+  * "The technology sector/AI industry is transitioning/shifting/undergoing a transition..."
+  * "The tech landscape is shifting..."
+  * "The technology landscape has officially entered..."
+  * "The AI industry has moved past/entered..."
+  * "Transitioning from speculative chatbot hype..."
+- HIGH-LEVEL SYNTHESIS: Connect the dots between different news items into a coherent story, but ensure it is grounded in real facts, numbers, dollar values, or company names from the summaries. Do NOT write in vague, generic platitudes.
+- OUTPUT FORMAT: Output ONLY the paragraph in PLAIN TEXT. No markdown (no bolding like **, no headers like ###, no bullet points). No introductory or concluding conversational filler.
+
+Newsletter Summaries:
+{combined}"""
         
         try:
             resp = self.retry_with_backoff(
                 lambda: self.model.generate_content(
                     prompt, 
-                    generation_config={"temperature": 0.3}
+                    generation_config={"temperature": 0.75}
                 )
             )
             return resp.text.strip() if resp and resp.text else ""
