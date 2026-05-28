@@ -149,8 +149,18 @@ def send_email(service, to, subject, html_body, bcc=None, reply_to=None):
 def fetch_newsletter_emails(service, window_start, window_end):
     logging.info(f"Checking for emails between {window_start} and {window_end}.")
     try:
+        import datetime
         user_email = get_user_email(service)
-        query = f"label:ai-newsletters newer_than:7d -from:{user_email}"
+        
+        # Optimize by dynamically querying Gmail for the specific date window
+        # Format dates as YYYY/MM/DD (inclusive start, exclusive end)
+        after_date = window_start.strftime('%Y/%m/%d')
+        # Add 1 day to end date to ensure the search bounds completely cover the window
+        before_date = (window_end + datetime.timedelta(days=1)).strftime('%Y/%m/%d')
+        
+        query = f"label:ai-newsletters after:{after_date} before:{before_date} -from:{user_email}"
+        logging.info(f"Gmail search query: '{query}'")
+        
         results = service.users().messages().list(userId='me', q=query).execute()
         messages = results.get('messages', [])
         logging.info(f"Found {len(messages)} messages matching the filter.")
@@ -184,20 +194,25 @@ def fetch_newsletter_emails(service, window_start, window_end):
             
             find_bodies(parts_to_search)
             
+            from_h = next((h['value'] for h in headers if h['name'].lower() == 'from'), '')
+            sender_name, _ = parseaddr(from_h)
+            sender_name = sender_name or 'Unknown Sender'
+
             message_body = ""
             article_link = None
             if html_body:
                 soup = BeautifulSoup(html_body, 'html.parser')
 
                 # FIRST: Find the primary article link while soup is completely intact (including <head>)
-                article_link = find_article_link(soup)
+                article_link = find_article_link(soup, sender_name)
 
                 for element in soup(["script", "style", "header", "footer", "nav", "aside", "form", "head", "meta", "link"]):
                     element.decompose()
                 for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
                     comment.extract()
 
-                # SECOND: Preserve relevant links as text markers for the AI
+                # SECOND: Preserve relevant links as text markers for the AI, and extract raw_links for Python direct matching
+                raw_links = []
                 for a in soup.find_all('a', href=True):
                     href = sanitize_url(a.get('href'))
                     text = a.get_text(strip=True)
@@ -206,27 +221,29 @@ def fetch_newsletter_emails(service, window_start, window_end):
                     # Skip social and utility links
                     if any(x in href.lower() for x in ['facebook.com', 'twitter.com', 'linkedin.com', 'instagram.com', 'unsubscribe', 'preferences', 'browser']):
                         continue
+                    raw_links.append({'text': text, 'href': href})
                     a.replace_with(f"{text} [{href}]")
 
                 message_body = soup.get_text(separator=' ', strip=True)
             elif plain_body:
                 message_body = plain_body
+                raw_links = []
             
             if message_body:
                 subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), '')
-                from_h = next((h['value'] for h in headers if h['name'].lower() == 'from'), '')
-                sender_name, _ = parseaddr(from_h)
 
                 # TLDR emails are summaries, not individual articles, so they shouldn't have a newsletter-level link
                 if 'TLDR' in sender_name:
                     article_link = None
 
-                filtered_emails.append({                    'id': message['id'],
+                filtered_emails.append({
+                    'id': message['id'],
                     'subject': subject,
-                    'sender': sender_name or 'Unknown Sender',
+                    'sender': sender_name,
                     'date': date_obj.strftime('%Y-%m-%d %H:%M:%S %Z'),
                     'body': message_body.strip(),
-                    'link': article_link
+                    'link': article_link,
+                    'raw_links': raw_links
                 })
                 logging.info(f"Found an email from '{sender_name}' with subject: {subject}")
         

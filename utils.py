@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 def resolve_redirects(url):
     """Resolve tracking links to their final destination URL using a browser User-Agent."""
-    redirectors = ['link.mail', 'click.mail', 't.mail', 'tracking.tldrnewsletter.com', 'ben-evans.us6.list-manage.com']
+    redirectors = ['link.mail', 'click.mail', 't.mail', 'tracking.tldrnewsletter.com', 'ben-evans.us6.list-manage.com', 'alphasignal.ai']
     if any(d in url.lower() for d in redirectors):
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -56,7 +56,7 @@ def sanitize_url(url, resolve=False):
         
     return url
 
-def find_article_link(soup):
+def find_article_link(soup, sender_name=None):
     """Search for the main article link in email body."""
     logging.debug("Searching for main article link in email body.")
     
@@ -80,48 +80,78 @@ def find_article_link(soup):
         redirectors = ['link.mail', 'click.mail', 't.mail', 'list-manage', 'forward-to-friend', 'doubleclick.net', 'tracking.tldrnewsletter.com']
         return any(d in url.lower() for d in redirectors)
 
-    # 1. Best Case: Look for a non-tracking link that contains /p/ or /posts/
+    # Detect if the email has a primary domain based on sender
+    sender_domain_kw = None
+    if sender_name:
+        sender_lower = sender_name.lower()
+        if 'ben thompson' in sender_lower or 'stratechery' in sender_lower:
+            sender_domain_kw = 'stratechery.com'
+        elif 'zain kahn' in sender_lower or 'superhuman' in sender_lower:
+            sender_domain_kw = 'superhuman.ai'
+        elif 'neuron' in sender_lower:
+            sender_domain_kw = 'theneurondaily.com'
+        elif 'breakfast' in sender_lower:
+            sender_domain_kw = 'aibreakfast'
+
+    # 1. Best Case: Look for a non-tracking "View online" / "View in browser" priority text link
+    for text in priority_texts:
+        for link in all_links:
+            anchor_text = link.get_text().lower() if link.get_text() else ""
+            if text in anchor_text:
+                href = link.get('href')
+                if href:
+                    href = href.replace('\n', '').replace('\r', '').strip()
+                    if not is_tracking_redirect(href):
+                        if not sender_domain_kw or sender_domain_kw in href.lower():
+                            return sanitize_url(href, resolve=True)
+
+    # 2. Look for a non-tracking link that contains /p/ or /posts/ AND matches the sender domain keyword if available
     for link in all_links:
         href = link.get('href')
         if not href: continue
-        # Strip newlines early to check it properly
         href = href.replace('\n', '').replace('\r', '').strip()
         
         if not is_tracking_redirect(href) and ('/p/' in href or '/posts/' in href):
-            # Exclude substack signup/subscribe links
             if 'subscribe' not in href and 'comment' not in href:
-                return sanitize_url(href, resolve=True)
+                if not sender_domain_kw or sender_domain_kw in href.lower():
+                    return sanitize_url(href, resolve=True)
 
-    # 2. Search for priority text matches
+    # 3. Fallback to priority text matches (even tracking ones)
     matches = []
     for text in priority_texts:
         for link in all_links:
-            if link.get_text() and text in link.get_text().lower():
+            anchor_text = link.get_text().lower() if link.get_text() else ""
+            if text in anchor_text:
                 href = link.get('href')
-                if href and not is_tracking_redirect(href):
-                    return sanitize_url(href, resolve=True) # Direct link found with priority text - BEST
-                if href: matches.append(href)
-    
-    if matches:
-        return sanitize_url(matches[0], resolve=True) # Return the first tracking link that matched priority text
-
-    # 3. Search for secondary text matches
-    for text in secondary_texts:
-        for link in all_links:
-            if link.get_text() and text in link.get_text().lower():
-                href = link.get('href')
-                if href and not is_tracking_redirect(href):
-                    return sanitize_url(href, resolve=True)
-                if href: matches.append(href)
-
+                if href:
+                    href = href.replace('\n', '').replace('\r', '').strip()
+                    if sender_domain_kw and sender_domain_kw in href.lower():
+                        return sanitize_url(href, resolve=True)
+                    matches.append(href)
     if matches:
         return sanitize_url(matches[0], resolve=True)
 
-    # 4. Fallback: Search for any link that looks like a primary article
+    # 4. Search for secondary text matches
+    for text in secondary_texts:
+        for link in all_links:
+            anchor_text = link.get_text().lower() if link.get_text() else ""
+            if text in anchor_text:
+                href = link.get('href')
+                if href:
+                    href = href.replace('\n', '').replace('\r', '').strip()
+                    if not is_tracking_redirect(href):
+                        if not sender_domain_kw or sender_domain_kw in href.lower():
+                            return sanitize_url(href, resolve=True)
+                    matches.append(href)
+    if matches:
+        return sanitize_url(matches[0], resolve=True)
+
+    # 5. Fallback: Search for any link that looks like a primary article
     best_fallback = None
     for link in all_links:
         href = link.get('href')
         if not href: continue
+        href = href.replace('\n', '').replace('\r', '').strip()
         
         text = link.get_text().lower() if link.get_text() else ""
         
@@ -131,9 +161,11 @@ def find_article_link(soup):
             continue
             
         if not is_tracking_redirect(href):
-            if 'article' in href.lower():
+            if sender_domain_kw and sender_domain_kw in href.lower():
                 return sanitize_url(href, resolve=True)
-            if not best_fallback:
+            if 'article' in href.lower() and not best_fallback:
+                best_fallback = href
+            elif not best_fallback:
                 best_fallback = href
                 
     if best_fallback:

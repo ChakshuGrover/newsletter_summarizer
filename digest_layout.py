@@ -3,10 +3,10 @@
 from collections import defaultdict
 
 CATEGORY_SECTIONS = [
-    ("products", "Models & Products"),
-    ("infrastructure", "Infrastructure & Chips"),
-    ("capital", "Business & Capital"),
-    ("industry", "Industry & Policy"),
+    ("products", "🧠 Models & Products"),
+    ("infrastructure", "🏗️ Infrastructure & Chips"),
+    ("capital", "💸 Business & Capital"),
+    ("industry", "🏛️ Industry & Policy"),
 ]
 
 VALID_CATEGORIES = {c[0] for c in CATEGORY_SECTIONS}
@@ -196,6 +196,9 @@ def render_story_card(story, index, get_tag_badge, *, compact=False, show_catego
           <p class="story-body"><b>The News:</b> {story.get('news', '')}</p>
           <p class="story-body"><b>The Impact:</b> {story.get('impact', '')}</p>
 """
+    
+
+
     tag_reason = story.get("tag_reason", "")
     if tag_reason:
         html += f'          <div class="story-context">Context: {tag_reason}</div>\n'

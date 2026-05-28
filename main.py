@@ -90,14 +90,11 @@ def main():
         logging.info("Sleeping for 60 seconds to reset Token Per Minute (TPM) quota...")
         time.sleep(60)
         
-        logging.info("Generating macro landscape commentary...")
-        commentary = summarizer.generate_landscape_commentary(summaries)
+        logging.info("Generating consolidated digest data (commentary, top stories)...")
+        digest_data = summarizer.generate_digest_data(summaries, update_history=not args.force, target_date=target_date_str)
         
-        logging.info("Sleeping for 15 seconds to respect rate limits...")
-        time.sleep(15)
-        
-        logging.info("Extracting top stories and generating contrarian take...")
-        top_stories_data = summarizer.get_top_stories(summaries, update_history=not args.force, target_date=target_date_str)
+        commentary = digest_data.get("commentary", "")
+        top_stories_data = digest_data.get("top_stories", [])
         
         html_body = f"""<!DOCTYPE html>
 <html>
@@ -285,6 +282,45 @@ def main():
       color: #334155;
       font-weight: 600;
     }}
+    .tldr-card {{
+      background-color: #FFE4E6; /* Soft Light Rose */
+      border: 2px solid #1E293B;
+      padding: 24px;
+      border-radius: 8px;
+      box-shadow: 4px 4px 0px #1E293B;
+      margin-bottom: 30px;
+    }}
+    .tldr-list {{
+      margin: 0;
+      padding-left: 20px;
+      font-weight: 700;
+      color: #9F1239; /* Rich Rose Dark */
+      font-size: 15px;
+      line-height: 1.7;
+    }}
+    .tldr-list li {{
+      margin-bottom: 8px;
+    }}
+    .analogy-bullet {{
+      margin-top: 12px !important;
+      padding: 8px 12px;
+      background-color: #ECFDF5; /* Soft Mint Green */
+      border-left: 4px solid #10B981;
+      font-size: 13px !important;
+      color: #065F46 !important;
+      border-radius: 4px;
+    }}
+    .killer-quote {{
+      margin: 16px 0;
+      padding: 10px 18px;
+      border-left: 4px solid #F59E0B; /* Warm Amber */
+      background-color: #FEF3C7; /* Soft Light Amber */
+      font-style: italic;
+      font-size: 13.5px;
+      color: #78350F;
+      font-weight: 500;
+      border-radius: 4px;
+    }}
     .story-list {{
       margin: 0;
       padding-left: 20px;
@@ -345,6 +381,8 @@ def main():
 
 """
 
+
+
         if commentary:
             html_body += f"""
         <div class="section-title pill pill--macro">Macro Landscape Commentary</div>
@@ -390,8 +428,24 @@ def main():
             if not os.path.exists(ARCHIVE_DIR):
                 os.makedirs(ARCHIVE_DIR)
             
-            archive_filename = f"digest_{window_end.strftime('%Y-%m-%d')}.html"
-            archive_path = os.path.join(ARCHIVE_DIR, archive_filename)
+            date_str = window_end.strftime('%Y-%m-%d')
+            base_filename = f"digest_{date_str}.html"
+            base_path = os.path.join(ARCHIVE_DIR, base_filename)
+            
+            if not os.path.exists(base_path):
+                # First run of the day (regardless of force or scheduled)
+                archive_filename = base_filename
+                archive_path = base_path
+            else:
+                # File already exists, version it sequentially to prevent overwriting
+                idx = 1
+                suffix = "f" if args.force else "v"
+                while True:
+                    archive_filename = f"digest_{date_str}_{suffix}{idx}.html"
+                    archive_path = os.path.join(ARCHIVE_DIR, archive_filename)
+                    if not os.path.exists(archive_path):
+                        break
+                    idx += 1
             
             with open(archive_path, 'w') as f:
                 f.write(f"<!-- Subject: {subject} -->\n")

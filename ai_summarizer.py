@@ -9,6 +9,7 @@ import google.generativeai as genai
 from bs4 import BeautifulSoup
 from config import API_KEYS, HISTORY_FILE
 from digest_layout import normalize_category, normalize_tier
+from utils import sanitize_url
 
 class RateLimiter:
     def __init__(self, rate_limit_per_minute):
@@ -45,7 +46,7 @@ class AISummarizer:
 - CRITICAL: Prioritize truly current events and news from the last 7 days. 
 - IGNORE historical recaps, long analytical essays reflecting on old deals, "looking back" sections, or background context unless there is a significant NEW development reported *today*.
 - If you are unsure if a piece of news is recent, err on the side of excluding it.
-- **LINKS**: If a story has a relevant URL provided in brackets [like this], preserve that URL in your summary by making the story title or key phrase a clickable link: `<a href="URL">Title</a>`."""
+- **LINKS (CRITICAL)**: For every single news event, tool, or story you summarize, if there is a URL provided in brackets [like this] anywhere in that section in the source text, you MUST preserve that exact URL in your summary. Make the key subject name, title, or key phrase a clickable link: `<a href="URL">Subject</a>`. Do NOT omit or lose these links; every reported fact should be link-rich if it was linked in the source."""
 
     def _repair_json(self, raw_text):
         """Repair common JSON formatting issues from AI output."""
@@ -56,13 +57,26 @@ class AISummarizer:
         raw_text = raw_text.replace("```json", "").replace("```", "").strip()
         
         # Try to find the start and end of the JSON array or object
-        start_idx = raw_text.find("[")
-        if start_idx == -1:
-            start_idx = raw_text.find("{")
+        start_idx_bracket = raw_text.find("[")
+        start_idx_brace = raw_text.find("{")
+        
+        if start_idx_bracket != -1 and start_idx_brace != -1:
+            start_idx = min(start_idx_bracket, start_idx_brace)
+        elif start_idx_bracket != -1:
+            start_idx = start_idx_bracket
+        else:
+            start_idx = start_idx_brace
             
-        end_idx = raw_text.rfind("]")
-        if end_idx == -1:
-            end_idx = raw_text.rfind("}")
+        # For end, check which of ] or } comes last
+        end_idx_bracket = raw_text.rfind("]")
+        end_idx_brace = raw_text.rfind("}")
+        
+        if end_idx_bracket != -1 and end_idx_brace != -1:
+            end_idx = max(end_idx_bracket, end_idx_brace)
+        elif end_idx_bracket != -1:
+            end_idx = end_idx_bracket
+        else:
+            end_idx = end_idx_brace
             
         if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
             raw_text = raw_text[start_idx:end_idx + 1]
@@ -124,7 +138,8 @@ class AISummarizer:
                 email_metadata.append({
                     'subject': email['subject'], 
                     'sender': email['sender'], 
-                    'link': email.get('link')
+                    'link': email.get('link'),
+                    'raw_links': email.get('raw_links', [])
                 })
                 emails_text += f"\n--- Email {i+1} ---\nSubject: {email['subject']}\nFrom: {email['sender']}\nDate: {email.get('date', 'Unknown')}\nContent:\n{email['body']}\n---\n"
 
@@ -187,7 +202,8 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
                     'subject': metadata['subject'],
                     'summary_text': summary_text,
                     'sender': metadata['sender'],
-                    'link': metadata.get('link')
+                    'link': metadata.get('link'),
+                    'raw_links': metadata.get('raw_links', [])
                 })
         
         # Method 2: Try splitting by email numbers (Restored from original)
@@ -217,51 +233,173 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
                     'subject': metadata['subject'],
                     'summary_text': summary_text,
                     'sender': metadata['sender'],
-                    'link': metadata.get('link')
+                    'link': metadata.get('link'),
+                    'raw_links': metadata.get('raw_links', [])
                 })
 
         return summaries
 
-    def generate_landscape_commentary(self, summaries):
-        if not summaries:
-            return ""
+    def _find_all_sender_matches(self, sender_str, summaries):
+        if not sender_str or not summaries:
+            return []
         
-        combined = ""
-        for i, item in enumerate(summaries):
-            combined += f"Subject: {item['subject']}\nSummary: {item['summary_text']}\n\n"
-            
-        prompt = f"""Act as a world-class technology analyst, venture capitalist, and chief storyteller writing with the narrative flair of Wired, the sharp-witted clarity of Stratechery, and the editorial precision of The Economist.
-
-Analyze the following AI and Tech newsletter summaries and provide a single, punchy paragraph (maximum 5 sentences) that synthesizes the overarching narrative and 'vibe' of the industry over the last few days.
-
-CRITICAL CONTENT & CREATIVITY REQUIREMENTS:
-- HOOK WITH TECH & CAPABILITIES: Start immediately with a dynamic, specific opening hook focused on the latest technological breakthroughs, new product/model launches, or what is now possible with AI. Do NOT start with corporate drama, layoffs, or funding rounds; keep the focus on technology and capability first, integrating business context only as secondary support.
-- BANNED CLICHÉS: Strictly forbid the standard, repetitive opening formulas. Do NOT start with phrases like:
-  * "The technology sector/AI industry is transitioning/shifting/undergoing a transition..."
-  * "The tech landscape is shifting..."
-  * "The technology landscape has officially entered..."
-  * "The AI industry has moved past/entered..."
-  * "Transitioning from speculative chatbot hype..."
-- HIGH-LEVEL SYNTHESIS: Connect the dots between different news items into a coherent story, but ensure it is grounded in real facts, numbers, dollar values, or company names from the summaries. Do NOT write in vague, generic platitudes.
-- OUTPUT FORMAT: Output ONLY the paragraph in PLAIN TEXT. No markdown (no bolding like **, no headers like ###, no bullet points). No introductory or concluding conversational filler.
-
-Newsletter Summaries:
-{combined}"""
+        sender_clean = sender_str.strip().lower()
+        matches = []
         
+        # First pass: Exact match
+        for i, s in enumerate(summaries):
+            s_sender = s.get('sender', '').strip().lower()
+            if sender_clean == s_sender:
+                matches.append(i)
+        if matches:
+            return matches
+                
+        # Second pass: Substring match (e.g. "AI Breakfast" matches "AI Breakfast <no-reply@beehiiv.com>")
+        for i, s in enumerate(summaries):
+            s_sender = s.get('sender', '').strip().lower()
+            s_sub = s.get('subject', '').strip().lower()
+            if sender_clean in s_sender or s_sender in sender_clean or sender_clean in s_sub:
+                matches.append(i)
+        if matches:
+            return matches
+                
+        # Third pass: Token-based matching (e.g. "Zain Kahn" matches "Superhuman - Zain Kahn")
+        tokens = [t for t in sender_clean.split() if len(t) > 2]
+        for i, s in enumerate(summaries):
+            s_sender = s.get('sender', '').strip().lower()
+            if any(token in s_sender for token in tokens):
+                matches.append(i)
+                
+        return matches
+
+    def _extract_specific_story_link(self, story_title, story_news, html_summary, raw_links=None):
+        if not html_summary and not raw_links:
+            return None, 0.0
         try:
-            resp = self.retry_with_backoff(
-                lambda: self.model.generate_content(
-                    prompt, 
-                    generation_config={"temperature": 0.75}
-                )
-            )
-            return resp.text.strip() if resp and resp.text else ""
-
+            candidates = {}
+            
+            # 1. From HTML summary
+            if html_summary:
+                soup = BeautifulSoup(html_summary, 'html.parser')
+                for a in soup.find_all('a'):
+                    href = a.get('href', '')
+                    text = a.text.strip()
+                    if href and not href.startswith('#'):
+                        norm_href = href.rstrip('/')
+                        candidates[norm_href] = {'text': text, 'href': href}
+            
+            # 2. From raw email links
+            if raw_links:
+                for rl in raw_links:
+                    href = rl.get('href', '')
+                    text = rl.get('text', '')
+                    if href and not href.startswith('#'):
+                        norm_href = href.rstrip('/')
+                        if norm_href not in candidates or len(text) > len(candidates[norm_href]['text']):
+                            candidates[norm_href] = {'text': text, 'href': href}
+                            
+            if not candidates:
+                return None, 0.0
+            
+            # Score each link based on word matches between the story's details and the link's anchor text
+            raw_title_words = set(re.findall(r'\b\w{3,}\b', (story_title + " " + story_news).lower()))
+            
+            # Filter out common stop words to avoid accidental matches on generic terms
+            stop_words = {
+                'new', 'app', 'apps', 'tool', 'tools', 'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years', 
+                'today', 'daily', 'called', 'using', 'used', 'use', 'with', 'for', 'the', 'this', 'that', 'from', 'our', 
+                'your', 'their', 'them', 'they', 'here', 'there', 'who', 'what', 'why', 'how', 'where', 'when', 'will', 
+                'would', 'could', 'should', 'have', 'has', 'had', 'been', 'being', 'does', 'doing', 'done', 'make', 
+                'making', 'made', 'take', 'taking', 'took', 'get', 'getting', 'got', 'look', 'looking', 'looked', 'find', 
+                'finding', 'found', 'also', 'free', 'best', 'more', 'latest', 'trending', 'click', 'link', 'signup',
+                'sign', 'join', 'start', 'try', 'now', 'learn', 'get', 'pro'
+            }
+            title_words = raw_title_words - stop_words
+            if not title_words:
+                return None, 0.0
+            
+            best_link = None
+            best_score = 0.0
+            
+            for key, cand in candidates.items():
+                href = cand['href']
+                anchor_text = cand['text']
+                anchor_lower = anchor_text.strip().lower()
+                
+                # Check for 'readmore' or general read more text, but ONLY skip it if the URL itself doesn't contain high-quality keywords
+                is_read_more = 'readmore' in href.lower() or 'read more' in anchor_lower or anchor_lower in ['read more', 'learn more', 'click here', 'github link', 'github repo', 'github']
+                
+                # Calculate URL-based intersection score
+                url_words = set(re.findall(r'\b\w{3,}\b', href.lower())) - stop_words
+                url_intersection = title_words.intersection(url_words)
+                url_score = len(url_intersection) * 0.5
+                
+                # If it's a "read more" anchor but there's no URL match, skip it
+                if is_read_more and url_score == 0.0:
+                    continue
+                
+                raw_anchor_words = set(re.findall(r'\b\w{3,}\b', anchor_lower))
+                anchor_words = raw_anchor_words - stop_words
+                
+                if not anchor_words and not url_intersection:
+                    continue
+                
+                # Skip sponsor/ad anchors — these appear in every newsletter and are not news stories
+                sponsor_signals = ['sponsor', 'sponsored', 'advertisement', 'signup', 'sign up',
+                                   'subscribe', 'unsubscribe', 'try for free', 'get started', 'learn more', 'click here']
+                if any(sig in anchor_lower for sig in sponsor_signals) and url_score == 0.0:
+                    continue
+                
+                # Calculate raw intersection score
+                anchor_intersection = title_words.intersection(anchor_words)
+                score = float(len(anchor_intersection))
+                
+                # Length-based word uniqueness bonus for anchor text words
+                common_entities = {
+                    'openai', 'anthropic', 'google', 'microsoft', 'meta', 'nvidia', 'apple', 'amazon',
+                    'chatgpt', 'claude', 'gemini', 'llama', 'copilot'
+                }
+                for word in anchor_intersection:
+                    if word not in common_entities:
+                        if len(word) > 4:
+                            score += 0.3
+                        if len(word) > 6:
+                            score += 0.4
+                
+                # Add URL-based intersection score and uniqueness bonus
+                score += url_score
+                for word in url_intersection:
+                    if word not in common_entities:
+                        if len(word) > 4:
+                            score += 0.15
+                        if len(word) > 6:
+                            score += 0.2
+                
+                # Length penalty: If anchor text is very long, it's likely a whole paragraph or malformed HTML section
+                if len(raw_anchor_words) > 15:
+                    score *= 0.1
+                elif len(raw_anchor_words) > 8:
+                    score *= 0.5
+                
+                # Short anchors (≤4 words) need a higher bar to avoid coincidental single-word hits on ad copy
+                min_score = 1.5 if len(raw_anchor_words) <= 4 else 0.8
+                
+                if score > best_score and score >= min_score:
+                    best_score = score
+                    best_link = href
+            
+            # Resolve tracking redirects and strip UTM params from the winning link
+            if best_link:
+                best_link = sanitize_url(best_link, resolve=True)
+            return best_link, best_score
         except Exception as e:
-            logging.error(f"Error generating commentary: {e}")
-            return ""
+            logging.warning(f"Error extracting specific story link: {e}")
+            return None, 0.0
 
-    def get_top_stories(self, summaries, update_history=True, target_date=None):
+    def generate_digest_data(self, summaries, update_history=True, target_date=None):
+        if not summaries:
+            return {"commentary": "", "top_stories": []}
+        
         history = []
         # Extended window to 30 days for better "Story Arc" tracking
         cutoff = (datetime.datetime.now() - datetime.timedelta(days=30)).isoformat()
@@ -285,59 +423,70 @@ Newsletter Summaries:
         for i, item in enumerate(summaries):
             combined += f"Story {i+1}:\nSubject: {item['subject']}\nSender: {item['sender']}\nLink: {item.get('link', '')}\nSummary: {item['summary_text']}\n\n"
 
-        prompt = f"""From the following newsletter summaries, identify the top AI & Tech stories (maximum 30).
+        prompt = f"""From the following newsletter summaries, analyze the tech news landscape and generate two structured elements in a single JSON response:
+    1. A high-level macro landscape commentary paragraph.
+    2. An array of the top AI & Tech stories (maximum 30) representing key developments.
     
-    **CRITICAL INSTRUCTIONS:**
-    1. Compare these new stories against the recent history provided below.
-    2. Categorize each new story with a Tag:
+    **CRITICAL INSTRUCTIONS FOR MACRO LANDSCAPE COMMENTARY:**
+    - Act as a world-class technology analyst, venture capitalist, and chief storyteller writing with the narrative flair of Wired, the sharp-witted clarity of Stratechery, and the editorial precision of The Economist.
+    - Provide a single, punchy paragraph (maximum 5 sentences) that synthesizes the overarching narrative and 'vibe' of the industry over the last few days.
+    - HOOK WITH TECH & CAPABILITIES: Start immediately with a dynamic, specific opening hook focused on the latest technological breakthroughs, new product/model launches, or what is now possible with AI. Do NOT start with corporate drama, layoffs, or funding rounds; keep the focus on technology and capability first, integrating business context only as secondary support.
+    - BANNED CLICHÉS: Strictly forbid the standard, repetitive opening formulas. Do NOT start with phrases like:
+      * "The technology sector/AI industry is transitioning/shifting/undergoing a transition..."
+      * "The tech landscape is shifting..."
+      * "The technology landscape has officially entered..."
+      * "The AI industry has moved past/entered..."
+      * "Transitioning from speculative chatbot hype..."
+    - HIGH-LEVEL SYNTHESIS: Connect the dots between different news items into a coherent story, but ensure it is grounded in real facts, numbers, dollar values, or company names from the summaries. Do NOT write in vague, generic platitudes.
+    
+    **CRITICAL INSTRUCTIONS FOR TOP STORIES:**
+    - Identify the top AI & Tech stories (maximum 30).
+    - Compare these new stories against the recent history provided below.
+    - Categorize each new story with a Tag:
        - 🟢 [New Break]: Entirely new developments.
        - 🔵 [Developing]: Significant updates to an ongoing storyline from the history.
        - 🔴 [Contradiction]: A pivot, reversal, or contradiction to a previous historical story.
-    3. Ignore stories that are merely repetitions of history without significant updates.
-    4. Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
-    5. For 🔵 [Developing] or 🔴 [Contradiction] stories, provide a ONE-LINE "Tag Reason" that explains exactly what it follows or contradicts from the history. If it is 🟢 [New Break], leave it empty.
-    6. SOURCE NEWSLETTER: For every story, identify the specific newsletter summary it was extracted from (represented as 'Story 1', 'Story 2', etc. in the list below).
-    7. CONTRARIAN TAKE: For every story, act as a sharp, highly analytical tech skeptic and generate a single-sentence 'Contrarian Take' or 'Devil's Advocate' perspective that highlights potential risks, overhyped aspects, or hidden downsides.
-    8. UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
-    9. STORY TIER: Assign each story exactly one tier:
-       - "headline": The 5–7 most important stories of the period (major industry shifts, landmark deals, flagship model launches). Use sparingly.
-       - "standard": Significant stories that belong in a themed section below.
+    - Ignore stories that are merely repetitions of history without significant updates.
+    - Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
+       - TONE: Write with the wit of Morning Brew and sharpness of Stratechery. Use vivid verbs, active voice, and avoid corporate jargon.
+    - For 🔵 [Developing] or 🔴 [Contradiction] stories, provide a ONE-LINE "Tag Reason" that explains exactly what it follows or contradicts from the history. If it is 🟢 [New Break], leave it empty.
+    - SOURCE NEWSLETTER SENDER: Identify the exact sender of the newsletter summary where this story was found (e.g., "AI Breakfast", "The Neuron", "TLDR AI"). Match it exactly to one of the Senders in the list below.
+      * CRITICAL: You MUST double-check that the story actually appears in the text block labeled with that specific Sender in the input below. Do NOT hallucinate or guess; if the story is under "Sender: TLDR AI", then output "TLDR AI". Do NOT map it to "AI Breakfast" or any other sender just because the topics are similar.
+    - CONTRARIAN TAKE: For every story, act as a sharp, highly analytical tech skeptic and generate a single-sentence 'Contrarian Take' or 'Devil's Advocate' perspective that highlights potential risks, overhyped aspects, or hidden downsides.
+    - UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
+    - STORY TIER: Assign each story exactly one tier:
+       - "headline": The 5–7 most important stories of the period. Use sparingly.
+       - "standard": Significant stories that belong in a themed section.
        - "nugget": Smaller but useful items (niche tool launches, minor feature updates, single data points). Aim for 5–10 nuggets when available.
-    10. CATEGORY: Assign each story exactly one primary category (use these exact snake_case values):
-       - "capital": Funding rounds, valuations, M&A, IPO/S-1 filings, major partnerships with dollar figures, and public-company financial news (quarterly earnings, revenue beats/misses, guidance, investor-day targets, secondary offerings).
-       - "products": Model launches and updates, benchmarks, papers, safety/interpretability research, shipped features, GA product releases, integrations, developer tools, and landmark researcher or lab-lead hires tied to model building (e.g. joins pretraining team). Prefer "products" over "industry" for technical talent moves.
-       - "infrastructure": Data centers, chips/TPUs/GPUs/CPUs, energy/grid, cloud capacity, compute architecture, hardware roadmaps.
-       - "industry": Layoffs, hiring freezes, reorgs, C-suite or business/operations leadership moves, regulation, lawsuits, military/government contracts, privacy, and security breaches. Do NOT use "industry" for earnings, revenue, IPO/filing news, or core R&D hires—use "capital" or "products" instead.
-       Category tie-breakers: (a) earnings + product launch in one newsletter → split into two stories (see rule 11); (b) chip earnings alone → "capital"; (c) new silicon/CPU/GPU announcement alone → "infrastructure"; (d) famous researcher joins training/R&D team → "products"; (e) CEO/CFO/COO or mass layoffs → "industry".
-    11. SPLIT COMBINED STORIES: When a newsletter summary clearly contains two distinct beats (e.g., "record Q1 earnings" AND "unveils new Vera CPU"), emit TWO separate JSON objects—one per beat—each with its own title, category, tier, and importance_rank. Do not merge unrelated developments into one card. Both items may share the same source_newsletter_index. Splits count toward the maximum of 30 stories.
-    12. IMPORTANCE_RANK: Integer 1–30 where 1 is the single most important story in this digest. Headlines should be ranks 1–7. Nuggets should be ranks 20–30.
+    - CATEGORY: Assign each story exactly one primary category (use these exact snake_case values):
+       - "capital", "products", "infrastructure", "industry".
+    - SPLIT COMBINED STORIES: When a newsletter summary clearly contains two distinct beats, emit TWO separate JSON objects—one per beat—each with its own title, category, tier, and importance_rank.
+    - IMPORTANCE_RANK: Integer 1–30 where 1 is the single most important story in this digest.
     
     **CRITICAL RECENTNESS & GROUNDING RULES:**
     1. ONLY identify stories that are reported as NEW or DEVELOPING breaking news within the provided summaries.
     2. IGNORE analytical essays, historical recaps, deep dives into old news, or "looking back" sections.
-    3. If a story mentions a deal or event that occurred months ago (even if discussed in a recent essay), EXCLUDE it.
-    4. Ensure every story is grounded in a specific, recent factual event reported in the provided newsletter summaries.
-    5. The "title" and "news" MUST reflect a development from the last 7 days, not background context or historical analysis.
-    6. Be extremely selective: prefer high-quality, truly recent stories over mediocre or old ones.
-    7. If a newsletter is an analytical deep dive into a company's past strategy, historical deals, or a "looking back" essay, DO NOT extract those events as "Top Stories". Every story MUST be a new factual development reported in the last 7 days.
-    8. VERIFY RECENTNESS: If the text describes an event in the past tense without a specific recent date (e.g., "Last year," "In 2024," "The previously announced deal"), EXCLUDE it. Only include news that is happening NOW.
-
+    3. Ensure every story is grounded in a specific, recent factual event reported in the provided newsletter summaries.
+    4. VERIFY RECENTNESS: If the text describes an event in the past tense without a specific recent date, EXCLUDE it.
+ 
     **Recent History Context (Last 30 Days):**
     {json.dumps(history_context, indent=2)}
-
+ 
     **Output Format:**
-    You MUST respond with ONLY valid JSON. Return an array of JSON objects, where each object has EXACTLY these keys:
-    - "title": (string) The subject title.
-    - "tag": (string) Either "🟢 [New Break]", "🔵 [Developing]", or "🔴 [Contradiction]".
-    - "tag_reason": (string) One-liner on what it followed or contradicted (if applicable).
-    - "news": (string) The concise summary.
-    - "impact": (string) The "So What?" impact statement.
-    - "source_newsletter_index": (integer) The 1-based index of the newsletter summary where this story was found (e.g., 1 for Story 1, 2 for Story 2, etc.).
-    - "contrarian_take": (string) The single-sentence contrarian take or skeptical perspective.
-    - "tier": (string) Exactly one of: "headline", "standard", "nugget".
-    - "category": (string) Exactly one of: "capital", "products", "infrastructure", "industry".
-    - "importance_rank": (integer) Importance rank 1–30 within this digest.
-
+    You MUST respond with ONLY valid JSON. Return a JSON object with EXACTLY these keys:
+    - "commentary": (string) The macro landscape commentary paragraph.
+    - "top_stories": (array of JSON objects) The list of top stories, where each story object has EXACTLY these keys:
+      * "title": (string) The subject title.
+      * "tag": (string) Either "🟢 [New Break]", "🔵 [Developing]", or "🔴 [Contradiction]".
+      * "tag_reason": (string) One-liner on what it followed or contradicted (if applicable).
+      * "news": (string) The concise summary.
+      * "impact": (string) The "So What?" impact statement.
+      * "source_newsletter_sender": (string) The exact sender of the newsletter summary where this story was found.
+      * "contrarian_take": (string) The single-sentence contrarian take.
+      * "tier": (string) Exactly one of: "headline", "standard", "nugget".
+      * "category": (string) Exactly one of: "capital", "products", "infrastructure", "industry".
+      * "importance_rank": (integer) Importance rank 1–30.
+ 
     Newsletter Summaries:
     {combined}"""
         
@@ -345,31 +494,66 @@ Newsletter Summaries:
             resp = self.retry_with_backoff(
                 lambda: self.model.generate_content(
                     prompt, 
-                    generation_config={"temperature": 0.0}
+                    generation_config={"temperature": 0.3}
                 )
             )
-
-            raw_text = resp.text if resp and resp.text else "[]"
-            
-            # Use the new robust JSON repair
+ 
+            raw_text = resp.text if resp and resp.text else "{}"
             raw_text = self._repair_json(raw_text)
             
-            top_stories_data = json.loads(raw_text)
+            data = json.loads(raw_text)
+            commentary = data.get("commentary", "")
+            top_stories_data = data.get("top_stories", [])
             
             if top_stories_data:
                 for story in top_stories_data:
                     story['tier'] = normalize_tier(story.get('tier'))
                     story['category'] = normalize_category(story.get('category'))
-                    idx = story.get('source_newsletter_index')
-                    if idx is not None:
-                        try:
-                            idx = int(idx)
-                            if 1 <= idx <= len(summaries):
-                                story['source_url'] = summaries[idx - 1].get('link') or ""
-                            else:
-                                story['source_url'] = ""
-                        except (ValueError, TypeError):
-                            story['source_url'] = ""
+                    
+                    sender_name = story.get('source_newsletter_sender')
+                    matched_indices = self._find_all_sender_matches(sender_name, summaries)
+                    
+                    if matched_indices:
+                        specific_link = None
+                        best_summary = summaries[matched_indices[0]]
+                        best_score_overall = 0.0
+                        
+                        # Check each matched summary for a specific matching link (e.g., if there are multiple issues)
+                        for idx in matched_indices:
+                            summary_obj = summaries[idx]
+                            link, score = self._extract_specific_story_link(
+                                story.get('title', ''),
+                                story.get('news', ''),
+                                summary_obj.get('summary_text', ''),
+                                raw_links=summary_obj.get('raw_links', [])
+                            )
+                            if link and score > best_score_overall:
+                                specific_link = link
+                                best_summary = summary_obj
+                                best_score_overall = score
+                        
+                        # Set to specific link if found, otherwise fallback to global newsletter link (sanitized)
+                        # CRITICAL: Only allow global fallback links for single-topic newsletters/blogs.
+                        # Curated/multi-topic digests should never use the global link as fallback because it leads to highly confusing, unrelated links.
+                        fallback_link = ""
+                        sender_lower = best_summary.get('sender', '').lower()
+                        
+                        # Define multi-topic senders that should NEVER fallback to global post URLs
+                        multi_topic_senders = [
+                            'tldr', 'tldr ai', 'ai breakfast', 'the neuron', 'the rundown ai', 
+                            'alphasignal', "ben's bites", 'last week in ai', 'import ai', 'jack clark'
+                        ]
+                        
+                        is_multi_topic = any(x in sender_lower for x in multi_topic_senders) or any(
+                            keyword in sender_lower for keyword in ['digest', 'roundup', 'weekly', 'daily', 'curated']
+                        )
+                        
+                        if not is_multi_topic:
+                            fallback_link = best_summary.get('link') or ""
+                            if fallback_link and not specific_link:
+                                fallback_link = sanitize_url(fallback_link, resolve=True)
+                                
+                        story['source_url'] = specific_link or fallback_link or ""
                     else:
                         story['source_url'] = ""
             
@@ -394,37 +578,40 @@ Newsletter Summaries:
                 with open(HISTORY_FILE, 'w') as f: 
                     json.dump(updated_history, f, indent=2)
             
-            return top_stories_data
+            return {
+                "commentary": commentary,
+                "top_stories": top_stories_data
+            }
         except Exception as e:
-            logging.error(f"Error getting top stories: {e}")
-            return []
-
+            logging.error(f"Error generating digest data: {e}")
+            return {"commentary": "", "top_stories": []}
+ 
     def generate_linkedin_posts(self, summaries):
         # Restored the full, high-quality LinkedIn prompt from original
         combined = ""
         for i, item in enumerate(summaries):
             combined += f"Story {i+1}:\nSubject: {item['subject']}\nSummary: {item['summary_text']}\n\n"
-
+ 
         prompt = f"""Act as a world-class LinkedIn ghostwriter. Using the newsletter summaries provided, generate 3 high-performance posts designed to maximize dwell time and engagement.
-
+ 
     **Engagement Framework:**
     - **The Hook:** Start with a punchy first line (under 10 words).
     - **The Body:** Use "The Slide" technique—short, punchy sentences. 1-2 emojis.
     - **The CTA:** End with a low-friction question.
     - **Visuals:** Prioritize white space.
-
+ 
     **Option Definitions:**
     1. **The Contrarian Highlight:** Focus on the biggest story. Challenge the popular opinion.
     2. **The "Too Busy To Read" Roundup:** "3 things you need to know today" format.
     3. **The "So What?" Insight:** Connect a specific development to a bottom-line implication.
-
+ 
     **Hashtag Rule:** Include exactly 3 relevant hashtags at the end.
-
+ 
     **Formatting Rules (CRITICAL):**
     - NO meta-text, labels (e.g., "Option 1"), or headers.
     - NO introductory or concluding conversational filler.
     - Separate the three options using exactly: |||POST_SEPARATOR|||
-
+ 
     Summaries:
     {combined}"""
         
@@ -436,7 +623,7 @@ Newsletter Summaries:
                 )
             )
             if not resp or not resp.text: return []
-
+ 
             return [p.strip() for p in resp.text.split("|||POST_SEPARATOR|||") if p.strip()]
         except Exception as e:
             logging.error(f"Error generating LinkedIn posts: {e}")
