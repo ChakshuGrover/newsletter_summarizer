@@ -115,6 +115,9 @@ def organize_stories(stories):
         s = dict(story)
         s["tier"] = normalize_tier(s.get("tier"))
         s["category"] = normalize_category(s.get("category"))
+        # Force capital category stories out of headlines to keep headlines focused on tech
+        if s["category"] == "capital" and s["tier"] == "headline":
+            s["tier"] = "standard"
         normalized.append(s)
 
     headlines = sorted(
@@ -127,10 +130,12 @@ def organize_stories(stories):
     )
     standard = [s for s in normalized if s["tier"] == "standard"]
 
-    # Fallback: if model omitted tiers, treat first 7 as headlines
+    # Fallback: if model omitted tiers, treat first 7 as headlines (excluding capital stories)
     if not headlines and not nuggets and standard:
-        headlines = sorted(standard[:7], key=_importance_key)
-        standard = standard[7:]
+        non_capital_standard = [s for s in standard if s["category"] != "capital"]
+        headlines = sorted(non_capital_standard[:7], key=_importance_key)
+        headline_titles = {h["title"] for h in headlines}
+        standard = [s for s in standard if s["title"] not in headline_titles]
 
     by_category = defaultdict(list)
     for story in standard:

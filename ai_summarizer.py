@@ -455,7 +455,8 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     - CONTRARIAN TAKE: For every story, act as a sharp, highly analytical tech skeptic and generate a single-sentence 'Contrarian Take' or 'Devil's Advocate' perspective that highlights potential risks, overhyped aspects, or hidden downsides.
     - UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
     - STORY TIER: Assign each story exactly one tier:
-       - "headline": The 5–7 most important stories of the period. Use sparingly.
+       - "headline": The 5–7 most important tech/product/infrastructure stories of the period. Use sparingly.
+         * CRITICAL: Do NOT assign "capital" stories (funding, IPOs, M&As, financial results) to the "headline" tier. Keep headlines focused strictly on the latest in technology, product launches, research breakthroughs, infrastructure, or significant industry policy. "capital" stories must always be labeled "standard" or "nugget".
        - "standard": Significant stories that belong in a themed section.
        - "nugget": Smaller but useful items (niche tool launches, minor feature updates, single data points). Aim for 5–10 nuggets when available.
     - CATEGORY: Assign each story exactly one primary category (use these exact snake_case values):
