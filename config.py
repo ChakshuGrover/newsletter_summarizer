@@ -38,6 +38,9 @@ RECIPIENT_EMAILS = [
     "anjistic@gmail.com",
     "Vipin.kgp21@gmail.com",
     "valour1414@gmail.com",
+    "amanparnami36@gmail.com",
+    "kashishparnami1992@gmail.com",
+    "divyanshu.grover@gmail.com",
 ]
 REPLY_TO_EMAIL = "chakshu.grover8@gmail.com"
 
