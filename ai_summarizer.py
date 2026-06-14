@@ -417,7 +417,14 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
         
         # Filter history to only include the last 30 days, excluding the current logical run day (to avoid feedback loops)
         active_history = [item for item in history if item.get('date', '') > cutoff and not item.get('date', '').startswith(logical_day_prefix)]
-        history_context = [{"title": item.get('title', item.get('subject', '')), "impact": item.get('impact', item.get('reason', ''))} for item in active_history]
+        history_context = [
+            {
+                "title": item.get('title', item.get('subject', '')),
+                "news": item.get('news', ''),
+                "impact": item.get('impact', item.get('reason', ''))
+            } 
+            for item in active_history
+        ]
 
         combined = ""
         for i, item in enumerate(summaries):
@@ -442,6 +449,10 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     **CRITICAL INSTRUCTIONS FOR TOP STORIES:**
     - Identify the top AI & Tech stories (maximum 30).
     - Compare these new stories against the recent history provided below.
+    - STRICT DUPLICATION GATING: Avoid duplicating stories that have already been reported in the history.
+      * Look at the "title" and "news" fields of the history. If a story in the summaries covers the same announcement, launch, or event (even if detailed by a different sender or with minor additional commentary/quotes), you MUST ignore and omit it.
+      * Do NOT include a story as 🔵 [Developing] unless there is a major new concrete milestone (e.g., a model that was previously announced is now actually open-sourced or public, or a company previously in talks has finalized a major acquisition). Mere secondary details about the same event (such as CEO interviews, minor features, or follow-up commentary) are considered repetitions and MUST be ignored.
+      * If a story is a repeat of history, omit it entirely from the output.
     - Categorize each new story with a Tag:
        - 🟢 [New Break]: Entirely new developments.
        - 🔵 [Developing]: Significant updates to an ongoing storyline from the history.
