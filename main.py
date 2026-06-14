@@ -118,7 +118,7 @@ def main():
       padding: 40px 0;
     }}
     .container {{
-      max-width: 650px;
+      max-width: 1000px;
       margin: 0 auto;
       background-color: #ffffff;
       border-radius: 12px;
@@ -366,6 +366,24 @@ def main():
       padding: 40px 30px;
       text-align: center;
       border-top: 2px solid #1E293B;
+    }}
+    @media (max-width: 600px) {{
+      .wrapper {{
+        padding: 15px 10px;
+      }}
+      .header {{
+        padding: 30px 15px;
+      }}
+      .header h1 {{
+        font-size: 26px;
+      }}
+      .content {{
+        padding: 20px 15px;
+      }}
+      .story-card {{
+        padding: 16px;
+        margin-bottom: 20px;
+      }}
     }}
   </style>
 </head>
