@@ -35,7 +35,7 @@ class AISummarizer:
             genai.configure(api_key=API_KEYS[0])
         
         # Using the Gemini 3.5 Flash model
-        self.model = genai.GenerativeModel('gemini-3.5-flash')
+        self.model = genai.GenerativeModel('gemini-3.6-flash')
         
         self.system_prompt = """You are an expert content curator. Summarize the provided newsletter content into a clean, well-formatted HTML response, filtering out any promotional material like ads, job postings, or subscription pleas.
 - Use `<ul>` and `<li>` for bullet points.
@@ -101,7 +101,7 @@ class AISummarizer:
                         logging.info(f"Rotating to API key index {self.current_key_index}...")
                         genai.configure(api_key=API_KEYS[self.current_key_index])
                         # CRITICAL FIX: Re-instantiate the model so it binds to the new active key
-                        self.model = genai.GenerativeModel('gemini-3.5-flash')
+                        self.model = genai.GenerativeModel('gemini-3.6-flash')
                         
                         try:
                             logging.info("Retrying immediately with the new rotated key...")
@@ -431,28 +431,26 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
             combined += f"Story {i+1}:\nSubject: {item['subject']}\nSender: {item['sender']}\nLink: {item.get('link', '')}\nSummary: {item['summary_text']}\n\n"
 
         prompt = f"""From the following newsletter summaries, analyze the tech news landscape and generate two structured elements in a single JSON response:
-    1. A high-level macro landscape commentary paragraph.
-    2. An array of the top AI & Tech stories (maximum 30) representing key developments.
+    1. A list of 2 to 4 dominant macro themes observed across ALL newsletter summaries.
+    2. An array of the top AI & Tech stories (strictly maximum 10 stories total across all tiers) representing key developments.
     
-    **CRITICAL INSTRUCTIONS FOR MACRO LANDSCAPE COMMENTARY:**
-    - Act as a world-class technology analyst, venture capitalist, and chief storyteller writing with the narrative flair of Wired, the sharp-witted clarity of Stratechery, and the editorial precision of The Economist.
-    - Provide a single, punchy paragraph (maximum 5 sentences) that synthesizes the overarching narrative and 'vibe' of the industry over the last few days.
-    - HOOK WITH TECH & CAPABILITIES: Start immediately with a dynamic, specific opening hook focused on the latest technological breakthroughs, new product/model launches, or what is now possible with AI. Do NOT start with corporate drama, layoffs, or funding rounds; keep the focus on technology and capability first, integrating business context only as secondary support.
-    - BANNED CLICHÉS: Strictly forbid the standard, repetitive opening formulas. Do NOT start with phrases like:
-      * "The technology sector/AI industry is transitioning/shifting/undergoing a transition..."
-      * "The tech landscape is shifting..."
-      * "The technology landscape has officially entered..."
-      * "The AI industry has moved past/entered..."
-      * "Transitioning from speculative chatbot hype..."
-    - HIGH-LEVEL SYNTHESIS: Connect the dots between different news items into a coherent story, but ensure it is grounded in real facts, numbers, dollar values, or company names from the summaries. Do NOT write in vague, generic platitudes.
+    **CRITICAL INSTRUCTIONS FOR MACRO THEMES:**
+    - Analyze all incoming newsletter summaries to identify the 2 to 4 dominant, overarching macro themes or storylines of the day.
+    - Connect the dots between different news items and show how they are part of a larger trend, rather than just repeating individual stories.
+    - For each theme, provide:
+      * A title representing the trend (e.g. "The Physical Constraints Bottleneck (Gigawatts & Capex)").
+      * A 1-2 sentence synthesis explaining why this trend matters and how it connects the stories under the overarching narrative.
+    - THEME DEDUPLICATION & CONTINUITY: Compare today's themes against the recent 30-day history. If an overarching theme (e.g. US-China sanctions) was already active in history, focus today's theme title and synthesis strictly on today's new updates, progression, or complications. Do not repeat high-level introductory overviews or define the theme from scratch.
     
     **CRITICAL INSTRUCTIONS FOR TOP STORIES:**
-    - Identify the top AI & Tech stories (maximum 30).
-    - Compare these new stories against the recent history provided below.
-    - STRICT DUPLICATION GATING: Avoid duplicating stories that have already been reported in the history.
-      * Look at the "title" and "news" fields of the history. If a story in the summaries covers the same announcement, launch, or event (even if detailed by a different sender or with minor additional commentary/quotes), you MUST ignore and omit it.
-      * Do NOT include a story as 🔵 [Developing] unless there is a major new concrete milestone (e.g., a model that was previously announced is now actually open-sourced or public, or a company previously in talks has finalized a major acquisition). Mere secondary details about the same event (such as CEO interviews, minor features, or follow-up commentary) are considered repetitions and MUST be ignored.
-      * If a story is a repeat of history, omit it entirely from the output.
+    - Identify the top AI & Tech stories (strictly maximum 10 stories total across all tiers).
+    - Compare these new stories against the recent 30-day history provided below.
+    - STRICT 30-DAY DUPLICATION & REPETITION GATING:
+      * Avoid duplicating stories that have already been reported in the history.
+      * Look at the "title" and "news" fields of the history. If a story in the summaries covers the same announcement, launch, corporate event, or product (even if detailed by a different sender or with minor additional commentary/quotes), you MUST ignore and omit it entirely from the output.
+      * **Continuity Limit**: Do NOT include a story as 🔵 [Developing] unless there is a **major, concrete and significant new milestone** reported today (e.g., a model that was previously rumored is now actually open-sourced, or a deal previously in talks has officially closed). If the new email just contains post-launch reactions, opinion pieces, follow-up analysis, minor feature tweaks, or reviews of a story already in the 30-day history, you MUST ignore and omit it.
+      * If a story is a repeat of history without a massive new milestone, omit it entirely from the output.
+    - STRICT CATEGORY LIMITS: Limit the number of 'capital' category stories (funding, IPOs, M&As, financial capex announcements) to a maximum of 2 stories in the entire digest. Focus the remaining 8+ stories strictly on product launches, model updates, open-source weights, technical infrastructure development, or regulatory policy. Relegate minor capital stories to nuggets or omit them.
     - Categorize each new story with a Tag:
        - 🟢 [New Break]: Entirely new developments.
        - 🔵 [Developing]: Significant updates to an ongoing storyline from the history.
@@ -462,18 +460,16 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
        - TONE: Write with the wit of Morning Brew and sharpness of Stratechery. Use vivid verbs, active voice, and avoid corporate jargon.
     - For 🔵 [Developing] or 🔴 [Contradiction] stories, provide a ONE-LINE "Tag Reason" that explains exactly what it follows or contradicts from the history. If it is 🟢 [New Break], leave it empty.
     - SOURCE NEWSLETTER SENDER: Identify the exact sender of the newsletter summary where this story was found (e.g., "AI Breakfast", "The Neuron", "TLDR AI"). Match it exactly to one of the Senders in the list below.
-      * CRITICAL: You MUST double-check that the story actually appears in the text block labeled with that specific Sender in the input below. Do NOT hallucinate or guess; if the story is under "Sender: TLDR AI", then output "TLDR AI". Do NOT map it to "AI Breakfast" or any other sender just because the topics are similar.
-    - CONTRARIAN TAKE: For every story, act as a sharp, highly analytical tech skeptic and generate a single-sentence 'Contrarian Take' or 'Devil's Advocate' perspective that highlights potential risks, overhyped aspects, or hidden downsides.
+    - OPTIONAL CONTRARIAN TAKE (STRICTLY MAX 3 STORIES): Act as a sharp, highly analytical tech skeptic. You must ONLY provide a 'contrarian_take' for at most 3 stories in the entire digest (specifically those that are highly hyped, controversial, or have major unaddressed risks). For all other stories, you MUST return an empty string "" in this field. Do not force generic boilerplate takes.
     - UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
-    - STORY TIER: Assign each story exactly one tier:
-       - "headline": The 5–7 most important tech/product/infrastructure stories of the period. Use sparingly.
-         * CRITICAL: Do NOT assign "capital" stories (funding, IPOs, M&As, financial results) to the "headline" tier. Keep headlines focused strictly on the latest in technology, product launches, research breakthroughs, infrastructure, or significant industry policy. "capital" stories must always be labeled "standard" or "nugget".
-       - "standard": Significant stories that belong in a themed section.
-       - "nugget": Smaller but useful items (niche tool launches, minor feature updates, single data points). Aim for 5–10 nuggets when available.
+    - STORY TIER: Assign each story exactly one tier (ensure total stories do not exceed 10):
+       - "headline": The 1-2 most important tech/product/infrastructure stories of the day. Use extremely sparingly. (Do NOT assign "capital" stories to the headline tier).
+       - "standard": Significant stories that belong in a themed section. Target 3-5 stories.
+       - "nugget": Smaller but useful items (niche tool launches, minor feature updates, single data points). Target 3-4 stories.
     - CATEGORY: Assign each story exactly one primary category (use these exact snake_case values):
        - "capital", "products", "infrastructure", "industry".
     - SPLIT COMBINED STORIES: When a newsletter summary clearly contains two distinct beats, emit TWO separate JSON objects—one per beat—each with its own title, category, tier, and importance_rank.
-    - IMPORTANCE_RANK: Integer 1–30 where 1 is the single most important story in this digest.
+    - IMPORTANCE_RANK: Integer 1–10 where 1 is the single most important story in this digest.
     
     **CRITICAL RECENTNESS & GROUNDING RULES:**
     1. ONLY identify stories that are reported as NEW or DEVELOPING breaking news within the provided summaries.
@@ -486,7 +482,9 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
  
     **Output Format:**
     You MUST respond with ONLY valid JSON. Return a JSON object with EXACTLY these keys:
-    - "commentary": (string) The macro landscape commentary paragraph.
+    - "macro_themes": (array of JSON objects) The list of macro themes observed, where each object has these keys:
+      * "theme_title": (string) The title of the macro theme.
+      * "synthesis": (string) Connecting synthesis paragraph.
     - "top_stories": (array of JSON objects) The list of top stories, where each story object has EXACTLY these keys:
       * "title": (string) The subject title.
       * "tag": (string) Either "🟢 [New Break]", "🔵 [Developing]", or "🔴 [Contradiction]".
@@ -494,10 +492,10 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
       * "news": (string) The concise summary.
       * "impact": (string) The "So What?" impact statement.
       * "source_newsletter_sender": (string) The exact sender of the newsletter summary where this story was found.
-      * "contrarian_take": (string) The single-sentence contrarian take.
+      * "contrarian_take": (string) The contrarian take (or empty string if not applicable).
       * "tier": (string) Exactly one of: "headline", "standard", "nugget".
       * "category": (string) Exactly one of: "capital", "products", "infrastructure", "industry".
-      * "importance_rank": (integer) Importance rank 1–30.
+      * "importance_rank": (integer) Importance rank 1-10.
  
     Newsletter Summaries:
     {combined}"""
@@ -514,7 +512,7 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
             raw_text = self._repair_json(raw_text)
             
             data = json.loads(raw_text)
-            commentary = data.get("commentary", "")
+            commentary_themes = data.get("macro_themes", [])
             top_stories_data = data.get("top_stories", [])
             
             if top_stories_data:
@@ -579,6 +577,7 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
                         'impact': story.get('impact', ''),
                         'tag_reason': story.get('tag_reason', ''),
                         'source_url': story.get('source_url', ''),
+                        'source_newsletter_sender': story.get('source_newsletter_sender', 'unknown'),
                         'contrarian_take': story.get('contrarian_take', ''),
                         'tier': story.get('tier', 'standard'),
                         'category': story.get('category', 'products'),
@@ -591,12 +590,12 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
                     json.dump(updated_history, f, indent=2)
             
             return {
-                "commentary": commentary,
+                "macro_themes": commentary_themes,
                 "top_stories": top_stories_data
             }
         except Exception as e:
             logging.error(f"Error generating digest data: {e}")
-            return {"commentary": "", "top_stories": []}
+            return {"macro_themes": [], "top_stories": []}
  
     def generate_linkedin_posts(self, summaries):
         # Restored the full, high-quality LinkedIn prompt from original
@@ -640,3 +639,65 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
         except Exception as e:
             logging.error(f"Error generating LinkedIn posts: {e}")
             return []
+
+    def generate_weekly_deep_dive(self, weekly_stories):
+        """Analyzes a week of top stories and generates a structured tech-analyst deep dive essay."""
+        combined = ""
+        for i, story in enumerate(weekly_stories):
+            combined += f"Story {i+1}:\nTitle: {story['title']}\nTag: {story.get('tag', '')}\nNews: {story['news']}\nImpact: {story['impact']}\nSender: {story.get('source_newsletter_sender', 'unknown')}\n\n"
+            
+        prompt = f"""You are a world-class technology strategist, venture capitalist, and chief analyst writing with the narrative depth and clear-headed structure of Ben Thompson's Stratechery and the editorial caliber of The Economist.
+        
+        Analyze the past week of AI & technology stories below and identify the **single most significant thematic storyline or trend** that dominated the industry. 
+        
+        Write a detailed, structured deep-dive essay on this topic. Your essay should be composed of exactly these three sections, written in clean markdown:
+        
+        1. **The Catalyst**: Detail the events that occurred this week, citing specific companies and decisions, to outline the facts of the situation.
+        2. **Strategic Implications**: Analyze the structural shifts, market changes, developer friction, or economic calculations this theme exposes.
+        3. **The Long-Term Outlook**: Provide a forward-looking, realistic forecast on where this trend lands in the next 1-5 years.
+        
+        **CRITICAL INSTRUCTIONS FOR ESSAY WRITING:**
+        - Ground the essay deeply in the facts and numbers of the provided stories. Do NOT write vague, generic marketing summaries.
+        - Write in an authoritative, analytical, and highly engaging editorial voice. Vary sentence lengths for narrative rhythm.
+        - Do NOT include any meta-introductions (like "Here is your deep dive...") or conclusions outside the essay.
+        - Do NOT include any ASCII drawings, block diagrams, or text-based charts. Rely strictly on clean, descriptive text paragraphs, bold terms, and structured bullet lists to explain concepts. The essay must look clean and readable on narrow mobile screens (like Telegram).
+        
+        **Output Format:**
+        You MUST respond with ONLY valid JSON. Return a JSON object with EXACTLY these keys:
+        - "topic_title": (string) A concise, highly punchy, and compelling title under 6-8 words max (e.g. "Pax Silica: The Geopolitical AI Cold War" or "The Sovereign AI Enclosure").
+        - "essay_markdown": (string) The full markdown-formatted essay containing the three sections.
+        
+        Weekly Stories:
+        {combined}"""
+        
+        try:
+            resp = self.retry_with_backoff(
+                lambda: self.model.generate_content(
+                    prompt,
+                    generation_config={
+                        "temperature": 0.5,
+                        "response_mime_type": "application/json",
+                        "response_schema": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "topic_title": {"type": "STRING"},
+                                "essay_markdown": {"type": "STRING"}
+                            },
+                            "required": ["topic_title", "essay_markdown"]
+                        }
+                    }
+                )
+            )
+            raw_text = resp.text if resp and resp.text else "{}"
+            raw_text = self._repair_json(raw_text)
+            data = json.loads(raw_text)
+            return {
+                "topic_title": data.get("topic_title", "Weekly AI Strategy Deep Dive"),
+                "essay_markdown": data.get("essay_markdown", "No analysis generated.")
+            }
+        except Exception as e:
+            logging.error(f"Error generating weekly deep dive: {e}")
+            return {
+                "topic_title": "Weekly AI Strategy Deep Dive",
+                "essay_markdown": "Failed to synthesize weekly analysis due to an error."
+            }

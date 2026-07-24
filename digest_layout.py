@@ -1,6 +1,5 @@
-"""Organize and render digest stories into Headlines + themed sections + Nuggets."""
-
 from collections import defaultdict
+import html
 
 CATEGORY_SECTIONS = [
     ("products", "🧠 Models & Products"),
@@ -165,8 +164,7 @@ def get_category_badge(category):
 
 
 def render_section_title(section_id, label):
-    pill_class = SECTION_PILL_CLASS.get(section_id, "pill--macro")
-    return f'<div class="section-title pill {pill_class}">{label}</div>\n'
+    return f'<h2 class="section-title">{label}</h2>\n'
 
 
 def render_story_card(story, index, get_tag_badge, *, compact=False, show_category=False):
@@ -183,8 +181,6 @@ def render_story_card(story, index, get_tag_badge, *, compact=False, show_catego
         title_html = title_text
 
     card_class = "story-card nugget-card" if compact else "story-card"
-    padding = "18px" if compact else "24px"
-    margin = "20px" if compact else "30px"
 
     badges = "".join(b for b in (category_badge, badge_html) if b)
     badges_row = (
@@ -192,7 +188,7 @@ def render_story_card(story, index, get_tag_badge, *, compact=False, show_catego
     )
 
     html = f"""
-        <div class="{card_class}" style="padding: {padding}; margin-bottom: {margin};">
+        <div class="{card_class}">
           <div class="story-title">
             <div class="story-title-text">{title_html}</div>
 {badges_row}          </div>
@@ -208,7 +204,7 @@ def render_story_card(story, index, get_tag_badge, *, compact=False, show_catego
     if tag_reason:
         html += f'          <div class="story-context">Context: {tag_reason}</div>\n'
 
-    contrarian_take = story.get("contrarian_take", "")
+    contrarian_take = story.get("contrarian_take", "").strip()
     if contrarian_take and not compact:
         html += (
             f'          <div class="contrarian-bullet">'
@@ -216,7 +212,7 @@ def render_story_card(story, index, get_tag_badge, *, compact=False, show_catego
         )
     elif contrarian_take and compact:
         html += (
-            f'          <p class="story-body" style="font-size: 13px; margin-top: 8px;">'
+            f'          <p class="story-body skeptic-take-compact">'
             f"<b>Skeptic's Take:</b> {contrarian_take}</p>\n"
         )
 
@@ -250,3 +246,321 @@ def render_themed_stories(stories, get_tag_badge):
             )
 
     return "".join(html_parts), counter
+
+
+def markdown_to_html(md_text):
+    """Converts a subset of markdown (headers, bold, links, lists, paragraphs) into HTML."""
+    import re
+    import html
+    
+    # 1. Normalize spacing around headers to ensure they split into distinct blocks
+    lines = md_text.split('\n')
+    normalized_lines = []
+    for line in lines:
+        line_stripped = line.strip()
+        if line_stripped.startswith("### ") or line_stripped.startswith("## ") or line_stripped.startswith("# "):
+            normalized_lines.append("")
+            normalized_lines.append(line_stripped)
+            normalized_lines.append("")
+        else:
+            normalized_lines.append(line)
+    normalized_text = "\n".join(normalized_lines)
+    normalized_text = re.sub(r'\n\n+', '\n\n', normalized_text).strip()
+    
+    # 2. Escape HTML tags first to prevent raw injection
+    escaped = html.escape(normalized_text)
+    
+    # 3. Pre-process code blocks wrapped in triple backticks
+    code_blocks = []
+    def save_code_block(match):
+        code_content = match.group(1).strip()
+        placeholder = f"__CODE_BLOCK_{len(code_blocks)}__"
+        code_blocks.append(
+            f'<pre style="font-family: monospace; font-size: 13px; background-color: #F8FAFC; '
+            f'border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; overflow-x: auto; '
+            f'margin: 20px 0; color: #334155; line-height: 1.45; white-space: pre; text-align: left;">{code_content}</pre>'
+        )
+        return f"\n\n{placeholder}\n\n"
+        
+    escaped = re.sub(r'```(?:[a-zA-Z0-9_-]+)?\n(.*?)\n```', save_code_block, escaped, flags=re.DOTALL)
+    escaped = re.sub(r'```(.*?)```', save_code_block, escaped, flags=re.DOTALL)
+    
+    # 4. Split into blocks
+    blocks = re.split(r'\n\n+', escaped)
+    html_blocks = []
+    
+    in_list = False
+    
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+            
+        # Re-insert code block placeholders
+        if block.startswith("__CODE_BLOCK_") and block.endswith("__"):
+            if in_list:
+                html_blocks.append("</ul>")
+                in_list = False
+            idx = int(block[13:-2])
+            if idx < len(code_blocks):
+                html_blocks.append(code_blocks[idx])
+        # Horizontal rules (markdown dividers like --- or ***)
+        if block == "---" or block == "***" or re.match(r'^[-*_]{3,}$', block):
+            if in_list:
+                html_blocks.append("</ul>")
+                in_list = False
+            html_blocks.append('<hr style="border: 0; border-top: 1px solid #E2E8F0; margin: 30px 0;"/>')
+            continue
+
+        # Box drawing character or ASCII boundaries detection for raw diagrams
+        box_chars = r'[│─┌┐└┘┬┴┼▼▲◄►┬┴┤├─]'
+        is_ascii_diagram = False
+        if re.search(box_chars, block):
+            is_ascii_diagram = True
+        else:
+            # Analyze line-by-line for ASCII boundary boxes or structure
+            lines = block.split('\n')
+            diagram_line_count = 0
+            for line in lines:
+                line_stripped = line.strip()
+                if (line_stripped.startswith('+') and '-' in line_stripped) or \
+                   (line_stripped.startswith('|') and len(line_stripped) > 5) or \
+                   ('|' in line_stripped and ('--' in line_stripped or '  ' in line_stripped)):
+                    diagram_line_count += 1
+            if len(lines) > 1 and (diagram_line_count >= 2 or diagram_line_count / len(lines) >= 0.4):
+                is_ascii_diagram = True
+
+        if is_ascii_diagram:
+            if in_list:
+                html_blocks.append("</ul>")
+                in_list = False
+            html_blocks.append(
+                f'<pre style="font-family: monospace; font-size: 13px; background-color: #F8FAFC; '
+                f'border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; overflow-x: auto; '
+                f'margin: 20px 0; color: #334155; line-height: 1.45; white-space: pre; text-align: left;">{block}</pre>'
+            )
+            continue
+
+        # Headers
+        if block.startswith("### ") or block.startswith("## ") or block.startswith("# "):
+            if in_list:
+                html_blocks.append("</ul>")
+                in_list = False
+            
+            if block.startswith("### "):
+                level = 3
+                header_text = block[4:]
+            elif block.startswith("## "):
+                level = 2
+                header_text = block[3:]
+            else:
+                level = 1
+                header_text = block[2:]
+                
+            # Process inline markdown inside headers
+            header_text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2" style="color: #E5A93B; text-decoration: underline;">\1</a>', header_text)
+            header_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', header_text)
+            header_text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', header_text)
+            
+            if level == 3:
+                html_blocks.append(f'<h3 style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 800; color: #0F172A; margin: 32px 0 12px 0;">{header_text}</h3>')
+            elif level == 2:
+                html_blocks.append(f'<h2 style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 800; color: #0F172A; margin: 35px 0 15px 0;">{header_text}</h2>')
+            else:
+                html_blocks.append(f'<h1 style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 800; color: #0F172A; margin: 40px 0 20px 0;">{header_text}</h1>')
+                
+        elif block.startswith("1. ") or block.startswith("2. ") or block.startswith("3. "):
+            if in_list:
+                html_blocks.append("</ul>")
+                in_list = False
+            lines = block.split('\n')
+            section_html = []
+            for line in lines:
+                m = re.match(r'^(\d+)\.\s+\*\*(.*?)\*\*:\s*(.*)$', line.strip())
+                if m:
+                    num, title, body = m.groups()
+                    body = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2" style="color: #E5A93B; text-decoration: underline;">\1</a>', body)
+                    body = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', body)
+                    body = re.sub(r'\*(.*?)\*', r'<i>\1</i>', body)
+                    section_html.append(
+                        f'<p style="font-size: 14.5px; line-height: 1.7; color: #475569; margin: 0 0 20px 0;">'
+                        f'<b style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 16.5px; color: #0F172A; display: block; margin-bottom: 6px;">{num}. {title}</b>{body}</p>'
+                    )
+                else:
+                    parsed_line = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2" style="color: #E5A93B; text-decoration: underline;">\1</a>', line)
+                    parsed_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', parsed_line)
+                    parsed_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', parsed_line)
+                    section_html.append(f'<p style="font-size: 14.5px; line-height: 1.7; color: #475569; margin: 0 0 20px 0;">{parsed_line}</p>')
+            html_blocks.append("\n".join(section_html))
+            
+        elif block.startswith("* ") or block.startswith("- "):
+            if not in_list:
+                html_blocks.append('<ul style="margin: 0 0 20px 0; padding-left: 20px;">')
+                in_list = True
+            lines = block.split('\n')
+            for line in lines:
+                line_text = line.strip()
+                if line_text.startswith("* ") or line_text.startswith("- "):
+                    item_text = line_text[2:]
+                    item_text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2" style="color: #E5A93B; text-decoration: underline;">\1</a>', item_text)
+                    item_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', item_text)
+                    item_text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', item_text)
+                    html_blocks.append(f'<li style="margin-bottom: 10px; font-size: 14.5px; line-height: 1.7; color: #475569;">{item_text}</li>')
+        else:
+            if in_list:
+                html_blocks.append("</ul>")
+                in_list = False
+            paragraph_text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2" style="color: #E5A93B; text-decoration: underline;">\1</a>', block)
+            paragraph_text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', paragraph_text)
+            paragraph_text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', paragraph_text)
+            html_blocks.append(f'<p style="font-size: 14.5px; line-height: 1.7; color: #475569; margin: 0 0 20px 0;">{paragraph_text}</p>')
+            
+    if in_list:
+        html_blocks.append("</ul>")
+        
+    return "\n".join(html_blocks)
+
+
+def render_weekly_deep_dive(deep_dive_data, date_str):
+    """Generates the premium HTML email structure for the Sunday Editorial Weekly Deep Dive."""
+    topic_title = html.escape(deep_dive_data.get("topic_title", "Weekly AI Strategy Deep Dive"))
+    essay_markdown = deep_dive_data.get("essay_markdown", "No analysis generated.")
+    
+    essay_html = markdown_to_html(essay_markdown)
+    
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Deep Dive: {topic_title}</title>
+  <style>
+    body {{
+      margin: 0;
+      padding: 0;
+      background-color: #F3F4F6; /* Premium slate gray-blue canvas */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1E293B;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .wrapper {{
+      width: 100%;
+      background-color: #F3F4F6;
+      padding: 50px 0;
+    }}
+    .container {{
+      max-width: 680px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #E2E8F0; /* Clean fall-back border for clients stripping shadow */
+      border-top: 5px solid #E5A93B; /* Email-safe solid Ochre Gold top bar */
+      box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);
+    }}
+    .header {{
+      padding: 40px 30px 20px 30px;
+      text-align: left;
+      border-bottom: 1px solid #F1F5F9;
+    }}
+    .header p {{
+      margin: 0 0 8px 0;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #8E8870;
+    }}
+    .header h1 {{
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 30px;
+      font-weight: 800;
+      line-height: 1.3;
+      letter-spacing: -0.02em;
+      color: #0F172A;
+    }}
+    .content {{
+      padding: 20px 30px 40px 30px;
+    }}
+    .editorial-card {{
+      text-align: left;
+      font-size: 14.5px;
+      line-height: 1.7;
+      color: #475569;
+    }}
+    .editorial-card h3 {{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: #0F172A;
+      margin: 32px 0 12px 0;
+    }}
+    .editorial-card h3:first-of-type {{
+      margin-top: 0;
+    }}
+    .editorial-card p {{
+      margin: 0 0 20px 0;
+    }}
+    .editorial-card ul, .editorial-card ol {{
+      margin: 0 0 20px 0;
+      padding-left: 20px;
+    }}
+    .editorial-card li {{
+      margin-bottom: 10px;
+    }}
+    .editorial-card hr {{
+      border: 0;
+      border-top: 1px solid #F1F5F9;
+      margin: 30px 0;
+    }}
+    .numbered-story-title {{
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 16.5px;
+      color: #0F172A;
+      display: block;
+      margin-bottom: 6px;
+    }}
+    .editorial-card a {{
+      color: #6366F1;
+      text-decoration: underline;
+    }}
+    .editorial-card a:hover {{
+      color: #EC4899;
+    }}
+    .footer {{
+      background-color: #FAFAFA;
+      padding: 35px 50px;
+      text-align: left;
+      font-size: 11px;
+      color: #94A3B8;
+      border-top: 1px solid #F1F5F9;
+    }}
+    .footer p {{
+      margin: 4px 0;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <p>Sunday Strategy Editorial &bull; {date_str}</p>
+        <h1>{topic_title}</h1>
+      </div>
+      <div class="content">
+        <div class="editorial-card">
+          {essay_html}
+        </div>
+      </div>
+      <div class="footer">
+        <p>This weekly deep dive is synthesized from top technology stories using Antigravity AI.</p>
+        <p>&copy; 2026 AI &amp; Tech Digest. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+    return html_body
+

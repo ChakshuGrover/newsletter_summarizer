@@ -4,6 +4,8 @@ import os
 import argparse
 import sys
 import time
+import html
+import json
 
 from config import (
     setup_logging, LAST_RUN_FILE, EXPECTED_EMAIL, RECIPIENT_EMAILS, ARCHIVE_DIR, REPLY_TO_EMAIL
@@ -12,8 +14,8 @@ from gmail_manager import (
     get_gmail_service, get_user_email, fetch_newsletter_emails, send_email
 )
 from ai_summarizer import AISummarizer
-from digest_layout import render_themed_stories
-from notifier import send_telegram_message
+from digest_layout import render_themed_stories, render_weekly_deep_dive
+from notifier import send_telegram_message, format_digest_for_telegram, format_weekly_deep_dive_for_telegram
 
 def get_tag_badge(tag):
     tag = tag.strip().upper()
@@ -30,6 +32,7 @@ def main():
     parser = argparse.ArgumentParser(description='Summarize AI newsletters.')
     parser.add_argument('--days-offset', type=int, default=0, help='Number of days to go back.')
     parser.add_argument('--force', action='store_true', help='Bypass last run check.')
+    parser.add_argument('--weekly', action='store_true', help='Generate a weekly deep dive strategy editorial.')
     args = parser.parse_args()
 
     setup_logging()
@@ -49,19 +52,120 @@ def main():
     base_target_end = today_6am if now >= today_6am else today_6am - datetime.timedelta(days=1)
     window_end = base_target_end - datetime.timedelta(days=args.days_offset)
     
-    # Run only on Wednesday (2) and Saturday (5)
-    weekday = window_end.weekday()
-    if weekday == 2:
-        window_start = window_end - datetime.timedelta(days=4)
-    elif weekday == 5:
-        window_start = window_end - datetime.timedelta(days=3)
-    else:
-        if not args.force:
-            logging.info(f"Today is not a scheduled run day (Wednesday or Saturday). Exiting.")
+    # Sunday detection: automatically trigger Weekly Deep Dive
+    is_sunday = (window_end.weekday() == 6)
+    if is_sunday and not args.weekly:
+        logging.info("Sunday detected. Automatically switching to Weekly Deep Dive mode.")
+        args.weekly = True
+        
+    # Weekly Deep Dive Branch
+    if args.weekly:
+        logging.info("Weekly deep-dive mode active. Retrieving last 7 days of processed history...")
+        
+        # Calculate date range for past 7 days (relative to window_end)
+        end_date = window_end.date()
+        start_date = end_date - datetime.timedelta(days=7)
+        date_range_str = f"{start_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}"
+        logging.info(f"Targeting stories from {start_date} to {end_date}")
+        
+        # Load history file
+        history_path = "top_stories_history.json"
+        if not os.path.exists(history_path):
+            logging.error(f"History file {history_path} not found. Cannot run weekly deep dive.")
             return
-        else:
-            logging.info(f"Force flag used on non-scheduled run day. Defaulting to 1-day window.")
-            window_start = window_end - datetime.timedelta(days=1)
+            
+        try:
+            with open(history_path, 'r') as f:
+                history_stories = json.load(f)
+        except Exception as e:
+            logging.error(f"Failed to load history stories: {e}")
+            return
+            
+        # Filter stories in the 7-day range
+        weekly_stories = []
+        for story in history_stories:
+            story_date_str = story.get("date", "")
+            if not story_date_str:
+                continue
+            try:
+                # Date format: YYYY-MM-DD
+                story_date = datetime.datetime.strptime(story_date_str[:10], "%Y-%m-%d").date()
+                if start_date <= story_date <= end_date:
+                    weekly_stories.append(story)
+            except Exception as e:
+                logging.warning(f"Error parsing story date '{story_date_str}': {e}")
+                
+        if not weekly_stories:
+            logging.warning("No stories found in top_stories_history.json for the last 7 days. Exiting.")
+            return
+            
+        logging.info(f"Found {len(weekly_stories)} stories for synthesis.")
+        
+        # 3. AISummarizer generation
+        summarizer = AISummarizer()
+        deep_dive_data = summarizer.generate_weekly_deep_dive(weekly_stories)
+        
+        # 4. HTML Layout Rendering
+        weekly_html = render_weekly_deep_dive(deep_dive_data, date_range_str)
+        
+        # 5. Archive to file
+        weekly_filename = f"weekly_deep_dive_{end_date.strftime('%Y-%m-%d')}.html"
+        weekly_archive_path = os.path.join(ARCHIVE_DIR, weekly_filename)
+        try:
+            os.makedirs(ARCHIVE_DIR, exist_ok=True)
+            with open(weekly_archive_path, 'w') as f:
+                f.write(weekly_html)
+            logging.info(f"Weekly deep dive archived to {weekly_archive_path}")
+        except Exception as e:
+            logging.error(f"Failed to archive weekly deep dive: {e}")
+            
+        # 6. Email Dispatch
+        active_recipients = RECIPIENT_EMAILS
+        if args.force:
+            active_recipients = ["chakshu.grover8@gmail.com"]
+            logging.info(f"Forced run: overriding email recipients to: {active_recipients}")
+            
+        bcc_list = ", ".join(active_recipients)
+        subject = f"Weekly Deep Dive: {deep_dive_data.get('topic_title')}"
+        
+        logging.info(f"Sending weekly deep dive email. To: {EXPECTED_EMAIL}, BCC: {bcc_list}")
+        send_email(
+            service=service,
+            to=EXPECTED_EMAIL,
+            subject=subject,
+            html_body=weekly_html,
+            bcc=bcc_list,
+            reply_to=REPLY_TO_EMAIL
+        )
+        
+        # 7. Telegram Dispatch
+        try:
+            logging.info("Formatting and sending Telegram weekly deep-dive messages...")
+            telegram_messages = format_weekly_deep_dive_for_telegram(deep_dive_data, date_range_str)
+            
+            if args.force:
+                from config import TELEGRAM_TEST_CHAT_ID
+                if TELEGRAM_TEST_CHAT_ID:
+                    logging.info(f"Forced run detected. Redirecting Telegram message to test chat: {TELEGRAM_TEST_CHAT_ID}")
+                    for msg in telegram_messages:
+                        send_telegram_message(msg, chat_id=TELEGRAM_TEST_CHAT_ID)
+                        time.sleep(1)
+                else:
+                    logging.warning("Forced run detected but TELEGRAM_TEST_CHAT_ID is not configured. Skipping Telegram dispatch to prevent channel spam.")
+            else:
+                for msg in telegram_messages:
+                    send_telegram_message(msg)
+                    time.sleep(1) # Delay between chunks to preserve ordering
+        except Exception as e:
+            logging.error(f"Failed to format/send weekly Telegram: {e}")
+            
+        logging.info("Weekly deep-dive process complete.")
+        return
+    
+    # Daily run: 2 days on Monday to capture the weekend, 1 day otherwise
+    is_monday = (window_end.weekday() == 0)
+    lookback_days = 2 if is_monday else 1
+    window_start = window_end - datetime.timedelta(days=lookback_days)
 
     target_date_str = window_end.isoformat()
 
@@ -74,6 +178,13 @@ def main():
 
     # 4. Fetch and Process
     emails = fetch_newsletter_emails(service, window_start, window_end)
+    
+    # Fallback: if volume is dry (< 6 emails), expand search window to 3 days dynamically
+    if len(emails) < 6:
+        logging.info(f"Low daily email count ({len(emails)}) in {lookback_days}-day window. Expanding lookback to 3 days.")
+        window_start = window_end - datetime.timedelta(days=3)
+        emails = fetch_newsletter_emails(service, window_start, window_end)
+        
     if not emails:
         logging.info("No new emails. Marking window as processed.")
         with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
@@ -84,7 +195,10 @@ def main():
 
     if summaries:
         # 5. Generate Insights and Digest
-        date_range_str = f"{window_start.strftime('%b %d')} - {window_end.strftime('%b %d, %Y')}"
+        if (window_end - window_start).days <= 1:
+            date_range_str = window_end.strftime('%B %d, %Y')
+        else:
+            date_range_str = f"{window_start.strftime('%b %d')} - {window_end.strftime('%b %d, %Y')}"
         subject = f"AI & Tech Newsletters Digest - {date_range_str}"
         
         logging.info("Sleeping for 60 seconds to reset Token Per Minute (TPM) quota...")
@@ -93,7 +207,7 @@ def main():
         logging.info("Generating consolidated digest data (commentary, top stories)...")
         digest_data = summarizer.generate_digest_data(summaries, update_history=not args.force, target_date=target_date_str)
         
-        commentary = digest_data.get("commentary", "")
+        commentary_themes = digest_data.get("macro_themes", [])
         top_stories_data = digest_data.get("top_stories", [])
         
         html_body = f"""<!DOCTYPE html>
@@ -103,286 +217,260 @@ def main():
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{subject}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@800&display=swap');
     body {{
       margin: 0;
       padding: 0;
-      background-color: #F5F4F0;
-      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #F3F4F6; /* Premium slate gray-blue canvas */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       color: #1E293B;
       -webkit-font-smoothing: antialiased;
     }}
     .wrapper {{
       width: 100%;
-      background-color: #F5F4F0;
-      padding: 40px 0;
+      background-color: #F3F4F6;
+      padding: 50px 0;
     }}
     .container {{
-      max-width: 1000px;
+      max-width: 680px;
       margin: 0 auto;
       background-color: #ffffff;
       border-radius: 12px;
       overflow: hidden;
-      border: 2px solid #1E293B;
-      box-shadow: 6px 6px 0px #1E293B;
+      border: 1px solid #E2E8F0; /* Clean fall-back border for clients stripping shadow */
+      border-top: 5px solid #E5A93B; /* Email-safe solid Ochre Gold top bar */
+      box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);
     }}
     .header {{
-      background-color: #E5A93B; /* Refined Ochre Gold */
-      padding: 45px 30px;
-      text-align: center;
-      border-bottom: 2px solid #1E293B;
-    }}
-    .header h1 {{
-      margin: 0 0 10px 0;
-      font-family: "Outfit", "Inter", sans-serif;
-      font-size: 34px;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      text-transform: uppercase;
-      color: #1E293B;
+      padding: 40px 30px 20px 30px;
+      text-align: left;
+      border-bottom: 1px solid #F1F5F9;
     }}
     .header p {{
-      margin: 0;
-      font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: #1E293B;
-      opacity: 0.85;
-    }}
-    .content {{
-      padding: 35px 30px;
-    }}
-    .pill {{
-      display: inline-block;
+      margin: 0 0 8px 0;
       font-size: 10px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.2em;
+      color: #8E8870;
+    }}
+    .header h1 {{
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 32px;
+      font-weight: 800;
       line-height: 1.25;
-      border: 2px solid #1E293B;
-      border-radius: 4px;
-      padding: 4px 10px;
-      box-shadow: 3px 3px 0px #1E293B;
-      color: #1E293B;
-      vertical-align: middle;
+      letter-spacing: -0.02em;
+      color: #0F172A;
     }}
-    .pill--macro {{
-      background-color: #D35F47;
-      color: #ffffff;
-    }}
-    .pill--new-break {{
-      background-color: #A7E4CB;
-    }}
-    .pill--developing {{
-      background-color: #9ACBF7;
-    }}
-    .pill--contradiction {{
-      background-color: #FAAA9C;
-    }}
-    .pill--capital {{
-      background-color: #FDE68A;
-      color: #92400E;
-    }}
-    .pill--products {{
-      background-color: #DDD6FE;
-      color: #5B21B6;
-    }}
-    .pill--infrastructure {{
-      background-color: #D1FAE5;
-      color: #065F46;
-    }}
-    .pill--industry {{
-      background-color: #E2E8F0;
-      color: #334155;
+    .content {{
+      padding: 20px 30px 40px 30px;
     }}
     .section-title {{
-      margin-top: 32px;
-      margin-bottom: 22px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: #0F172A;
+      margin: 35px 0 20px 0;
+      border-bottom: 2px solid #F1F5F9;
+      padding-bottom: 8px;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }}
     .section-title:first-of-type {{
       margin-top: 0;
     }}
     .commentary-card {{
-      background-color: #FCF9F3; /* Light Warm Sand */
-      border: 2px solid #1E293B;
+      background-color: #F8FAFC;
+      border: 1px solid #E2E8F0;
       padding: 24px;
-      border-radius: 8px;
-      box-shadow: 4px 4px 0px #1E293B;
-      margin-bottom: 40px;
-    }}
-    .commentary-text {{
-      margin: 0;
-      font-size: 15px;
-      line-height: 1.65;
-      font-weight: 600;
-      color: #334155;
-    }}
-    .story-card {{
-      padding: 24px;
-      border: 2px solid #1E293B;
       border-radius: 8px;
       margin-bottom: 30px;
-      box-shadow: 4px 4px 0px #1E293B;
+    }}
+    .commentary-theme {{
+      margin-bottom: 20px;
+    }}
+    .commentary-theme:last-child {{
+      margin-bottom: 0;
+    }}
+    .commentary-theme h3 {{
+      margin: 0 0 6px 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #0F172A;
+    }}
+    .commentary-theme p {{
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #475569;
+    }}
+    .story-card {{
+      padding: 0 0 25px 0;
+      border-bottom: 1px solid #F1F5F9;
+      margin-bottom: 25px;
       background-color: #ffffff;
+      text-align: left;
+    }}
+    .story-card:last-child {{
+      border-bottom: none;
+      margin-bottom: 10px;
+      padding-bottom: 0;
     }}
     .nugget-card {{
-      background-color: #FCF9F3;
-      box-shadow: 3px 3px 0px #1E293B;
+      padding: 0 0 20px 0;
+      border-bottom: 1px solid #F1F5F9;
+      margin-bottom: 20px;
+      background-color: #ffffff;
     }}
-    .story-title {{
-      margin: 0 0 14px 0;
+    .nugget-card:last-child {{
+      border-bottom: none;
+      margin-bottom: 5px;
+      padding-bottom: 0;
+    }}
+    .skeptic-take-compact {{
+      font-size: 13px;
+      margin-top: 8px;
     }}
     .story-title-text {{
-      font-size: 18px;
-      font-weight: 800;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16.5px;
+      font-weight: 700;
+      color: #0F172A;
+      margin: 0 0 8px 0;
       line-height: 1.4;
-      margin: 0 0 10px 0;
-    }}
-    .story-title-badges {{
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
     }}
     .story-title-text a {{
-      color: #1E293B;
-      text-decoration: underline;
-      text-decoration-thickness: 2px;
-      text-underline-offset: 3px;
-      transition: all 0.2s ease;
+      color: #0F172A;
+      text-decoration: none;
     }}
     .story-title-text a:hover {{
-      color: #D35F47;
-      text-decoration-color: #D35F47;
+      color: #E5A93B;
+      text-decoration: underline;
+    }}
+    .story-title-badges {{
+      margin-bottom: 10px;
+      padding: 0;
+    }}
+    .pill {{
+      display: inline-block;
+      font-size: 8px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      line-height: 1.25;
+      border-radius: 4px;
+      padding: 3px 7px;
+      margin-right: 6px; /* Universal spacing fallback for flexbox gaps */
+      margin-bottom: 4px;
+      vertical-align: middle;
+    }}
+    .pill--new-break {{
+      background-color: #EEF2FF;
+      color: #4F46E5;
+    }}
+    .pill--developing {{
+      background-color: #F0FDF4;
+      color: #16A34A;
+    }}
+    .pill--contradiction {{
+      background-color: #FFF5F5;
+      color: #EF4444;
+    }}
+    .pill--products, .pill--models-&-products, .pill--🧠-models-&-products {{
+      background-color: #F1F5F9;
+      color: #334155;
+    }}
+    .pill--infrastructure, .pill--infrastructure-&-chips, .pill--🏗️-infrastructure-&-chips {{
+      background-color: #ECFDF5;
+      color: #065F46;
+    }}
+    .pill--industry, .pill--industry-&-policy, .pill--🏛️-industry-&-policy {{
+      background-color: #F8FAFC;
+      color: #475569;
+    }}
+    .pill--capital, .pill--business-&-capital, .pill--💸-business-&-capital {{
+      background-color: #FFFBEB;
+      color: #D97706;
     }}
     .story-body {{
       font-size: 14px;
-      line-height: 1.6;
-      color: #334155;
-      margin: 0 0 10px 0;
+      line-height: 1.65;
+      color: #475569;
+      margin: 0 0 8px 0;
     }}
     .story-context {{
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 700;
       color: #4F46E5;
-      margin: 8px 0;
+      margin: 6px 0;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }}
     .contrarian-bullet {{
-      margin-top: 16px;
-      padding: 14px 18px;
-      background-color: #FFEBD3; /* Elegant Warm Apricot Cream */
-      border: 2px solid #1E293B;
-      box-shadow: 3px 3px 0px #1E293B;
-      border-radius: 6px;
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #FAF8F0 0%, #FAF6E8 100%);
+      border-left: 4px solid #E5A93B;
       font-size: 13.5px;
-      line-height: 1.55;
-      color: #334155;
-      font-weight: 600;
-    }}
-    .tldr-card {{
-      background-color: #FFE4E6; /* Soft Light Rose */
-      border: 2px solid #1E293B;
-      padding: 24px;
-      border-radius: 8px;
-      box-shadow: 4px 4px 0px #1E293B;
-      margin-bottom: 30px;
-    }}
-    .tldr-list {{
-      margin: 0;
-      padding-left: 20px;
-      font-weight: 700;
-      color: #9F1239; /* Rich Rose Dark */
-      font-size: 15px;
-      line-height: 1.7;
-    }}
-    .tldr-list li {{
-      margin-bottom: 8px;
-    }}
-    .analogy-bullet {{
-      margin-top: 12px !important;
-      padding: 8px 12px;
-      background-color: #ECFDF5; /* Soft Mint Green */
-      border-left: 4px solid #10B981;
-      font-size: 13px !important;
-      color: #065F46 !important;
-      border-radius: 4px;
-    }}
-    .killer-quote {{
-      margin: 16px 0;
-      padding: 10px 18px;
-      border-left: 4px solid #F59E0B; /* Warm Amber */
-      background-color: #FEF3C7; /* Soft Light Amber */
+      line-height: 1.6;
+      color: #475569;
       font-style: italic;
-      font-size: 13.5px;
-      color: #78350F;
-      font-weight: 500;
-      border-radius: 4px;
-    }}
-    .story-list {{
-      margin: 0;
-      padding-left: 20px;
-    }}
-    .story-list li {{
-      margin-bottom: 8px;
-      font-size: 14px;
-      line-height: 1.55;
-      color: #334155;
+      border-radius: 0 6px 6px 0;
     }}
     .sources-section {{
       text-align: left;
-      margin-bottom: 30px;
+      margin-bottom: 25px;
       padding: 20px;
-      background-color: #ffffff;
-      border: 2px solid #1E293B;
-      box-shadow: 3px 3px 0px #1E293B;
-      border-radius: 6px;
+      background-color: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
     }}
     .sources-title {{
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #1E293B;
+      letter-spacing: 0.1em;
+      color: #64748B;
       margin: 0 0 10px 0;
     }}
     .sources-links {{
       font-size: 12px;
       line-height: 1.6;
       font-weight: 600;
-      color: #475569;
+      color: #64748B;
     }}
     .sources-links a {{
-      color: #1E293B;
+      color: #E5A93B;
       text-decoration: underline;
     }}
     .sources-links a:hover {{
-      color: #D35F47;
+      color: #EC4899;
     }}
     .footer {{
-      background-color: #EFEBE4;
-      padding: 40px 30px;
-      text-align: center;
-      border-top: 2px solid #1E293B;
+      background-color: #FAFAFA;
+      padding: 30px 30px;
+      text-align: left;
+      font-size: 11px;
+      color: #94A3B8;
+      border-top: 1px solid #F1F5F9;
+    }}
+    .footer p {{
+      margin: 4px 0;
     }}
     @media (max-width: 600px) {{
       .wrapper {{
         padding: 15px 10px;
       }}
       .header {{
-        padding: 30px 15px;
+        padding: 30px 20px;
       }}
       .header h1 {{
         font-size: 26px;
       }}
       .content {{
-        padding: 20px 15px;
-      }}
-      .story-card {{
-        padding: 16px;
-        margin-bottom: 20px;
+        padding: 20px;
       }}
     }}
   </style>
@@ -391,22 +479,28 @@ def main():
   <div class="wrapper">
     <div class="container">
       <div class="header">
-        <p>Your AI &amp; Tech Newsletter Brief</p>
-        <h1>AI & Tech Digest</h1>
-        <p style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: #1E293B; opacity: 0.85; margin-top: 6px;">{date_range_str}</p>
+        <p>Daily Briefing &bull; {date_range_str}</p>
+        <h1>AI &amp; Tech Digest</h1>
       </div>
       <div class="content">
-
 """
 
-
-
-        if commentary:
-            html_body += f"""
-        <div class="section-title pill pill--macro">Macro Landscape Commentary</div>
+        if commentary_themes:
+            html_body += """
+        <h2 class="section-title">Macro Themes Analysis</h2>
         <div class="commentary-card">
-          <p class="commentary-text">"{commentary}"</p>
-        </div>
+"""
+            for theme in commentary_themes:
+                theme_title = html.escape(theme.get("theme_title", "Unnamed Theme"))
+                synthesis = html.escape(theme.get("synthesis", ""))
+                
+                html_body += f"""
+          <div class="commentary-theme">
+            <h3>{theme_title}</h3>
+            <p>{synthesis}</p>
+          </div>
+"""
+            html_body += """        </div>
 """
         
         stories_html, _ = render_themed_stories(top_stories_data, get_tag_badge)
@@ -425,12 +519,12 @@ def main():
       </div> <!-- /content -->
       <div class="footer">
         <div class="sources-section">
-          <div class="sources-title">Sources Scanned ({len(summaries)} newsletters)</div>
+          <div class="sources-title">Sources Scanned</div>
           <div class="sources-links">
             {", ".join(sources)}
           </div>
         </div>
-        <p style="margin-top: 30px; font-size: 11px; color: #475569;">
+        <p style="margin-top: 30px; font-size: 11px; color: #94A3B8;">
           You are receiving this because you subscribed to the AI &amp; Tech Newsletters Digest.<br>
           ChakshuGrover/newsletter_summarizer &copy; 2026. All rights reserved.
         </p>
@@ -488,18 +582,27 @@ def main():
             bcc=bcc_list,
             reply_to=REPLY_TO_EMAIL
         )
-
-        # 6. LinkedIn & Telegram (Disabled for now)
-        # linkedin_posts = summarizer.generate_linkedin_posts(summaries)
-        # if linkedin_posts:
-        #     header = "📢 *Daily LinkedIn Post Options* (Ready to Copy/Paste):"
-        #     if args.force:
-        #         header = "🧪 *[TEST RUN] LinkedIn Post Options*:"
-
-        #     # send_telegram_message(header)
-        #     # for post in linkedin_posts:
-        #     #     send_telegram_message(post)
-        #     logging.info("Telegram notifications are currently disabled.")
+        
+        # 6. Telegram Channel Dispatch
+        try:
+            logging.info("Formatting and sending Telegram channel messages...")
+            telegram_messages = format_digest_for_telegram(digest_data, date_range_str)
+            
+            if args.force:
+                from config import TELEGRAM_TEST_CHAT_ID
+                if TELEGRAM_TEST_CHAT_ID:
+                    logging.info(f"Forced run detected. Redirecting Telegram message to test chat: {TELEGRAM_TEST_CHAT_ID}")
+                    for msg in telegram_messages:
+                        send_telegram_message(msg, chat_id=TELEGRAM_TEST_CHAT_ID)
+                        time.sleep(1)
+                else:
+                    logging.warning("Forced run detected but TELEGRAM_TEST_CHAT_ID is not configured. Skipping Telegram dispatch to prevent channel spam.")
+            else:
+                for msg in telegram_messages:
+                    send_telegram_message(msg)
+                    time.sleep(1) # Small delay to preserve message order and respect API rate limits
+        except Exception as e:
+            logging.error(f"Failed to format or send Telegram channel messages: {e}")
 
     # 7. Update state
     with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)

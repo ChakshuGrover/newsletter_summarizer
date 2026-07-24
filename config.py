@@ -15,6 +15,7 @@ for key, value in sorted(os.environ.items()):
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_TEST_CHAT_ID = os.getenv("TELEGRAM_TEST_CHAT_ID")
 
 # File Paths
 SECRET_FILE = "credentials.json"
