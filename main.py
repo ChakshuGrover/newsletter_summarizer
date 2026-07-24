@@ -477,28 +477,28 @@ def main():
   </style>
 </head>
 <body>
-  <div class="wrapper">
-    <div class="container">
-      <div class="header">
-        <p>Daily Briefing &bull; {date_range_str}</p>
-        <h1>AI &amp; Tech Digest</h1>
+  <div class="wrapper" style="width: 100%; background-color: #F3F4F6; padding: 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <div class="container" style="max-width: 680px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #E2E8F0; border-top: 5px solid #E5A93B; box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);">
+      <div class="header" style="padding: 40px 30px 20px 30px; text-align: left; border-bottom: 1px solid #F1F5F9;">
+        <p style="margin: 0 0 8px 0; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: #8E8870;">Daily Briefing &bull; {date_range_str}</p>
+        <h1 style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 32px; font-weight: 800; line-height: 1.25; letter-spacing: -0.02em; color: #0F172A;">AI &amp; Tech Digest</h1>
       </div>
-      <div class="content">
+      <div class="content" style="padding: 20px 30px 40px 30px;">
 """
-
+ 
         if commentary_themes:
             html_body += """
-        <h2 class="section-title">Macro Themes Analysis</h2>
-        <div class="commentary-card">
+        <h2 style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 800; color: #0F172A; margin: 35px 0 20px 0; border-bottom: 2px solid #F1F5F9; padding-bottom: 8px; text-align: left; text-transform: uppercase; letter-spacing: 0.05em;">Macro Themes Analysis</h2>
+        <div class="commentary-card" style="background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
 """
             for theme in commentary_themes:
                 theme_title = html.escape(theme.get("theme_title", "Unnamed Theme"))
                 synthesis = html.escape(theme.get("synthesis", ""))
                 
                 html_body += f"""
-          <div class="commentary-theme">
-            <h3>{theme_title}</h3>
-            <p>{synthesis}</p>
+          <div class="commentary-theme" style="margin-bottom: 20px;">
+            <h3 style="margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 700; color: #0F172A;">{theme_title}</h3>
+            <p style="margin: 0; font-size: 13.5px; line-height: 1.6; color: #475569;">{synthesis}</p>
           </div>
 """
             html_body += """        </div>
@@ -506,22 +506,22 @@ def main():
         
         stories_html, _ = render_themed_stories(top_stories_data, get_tag_badge)
         html_body += stories_html
-
+ 
             
         # Sources Scanned
         sources = []
         for s in summaries:
             source_info = f"{s['sender']} ({s['subject']})"
             if s.get('link'):
-                source_info = f"<a href='{s['link']}'>{source_info}</a>"
+                source_info = f"<a href='{s['link']}' style='color: #E5A93B; text-decoration: underline;'>{source_info}</a>"
             sources.append(source_info)
             
         html_body += f"""
       </div> <!-- /content -->
-      <div class="footer">
-        <div class="sources-section">
-          <div class="sources-title">Sources Scanned</div>
-          <div class="sources-links">
+      <div class="footer" style="background-color: #FAFAFA; padding: 30px 30px; text-align: left; font-size: 11px; color: #94A3B8; border-top: 1px solid #F1F5F9;">
+        <div class="sources-section" style="text-align: left; margin-bottom: 25px; padding: 20px; background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;">
+          <div class="sources-title" style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #64748B; margin: 0 0 10px 0;">Sources Scanned</div>
+          <div class="sources-links" style="font-size: 12px; line-height: 1.6; font-weight: 600; color: #64748B;">
             {", ".join(sources)}
           </div>
         </div>
