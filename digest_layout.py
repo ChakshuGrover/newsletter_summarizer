@@ -159,12 +159,29 @@ def organize_stories(stories):
 def get_category_badge(category):
     labels = dict(CATEGORY_SECTIONS)
     label = labels.get(category, "News")
-    pill_class = SECTION_PILL_CLASS.get(category, "pill--products")
-    return f'<span class="pill {pill_class}">{label}</span>'
+    
+    badge_colors = {
+        "products": {"bg": "#F1F5F9", "fg": "#334155"},
+        "models-&-products": {"bg": "#F1F5F9", "fg": "#334155"},
+        "🧠-models-&-products": {"bg": "#F1F5F9", "fg": "#334155"},
+        "infrastructure": {"bg": "#ECFDF5", "fg": "#065F46"},
+        "infrastructure-&-chips": {"bg": "#ECFDF5", "fg": "#065F46"},
+        "🏗️-infrastructure-&-chips": {"bg": "#ECFDF5", "fg": "#065F46"},
+        "industry": {"bg": "#F8FAFC", "fg": "#475569"},
+        "industry-&-policy": {"bg": "#F8FAFC", "fg": "#475569"},
+        "🏛️-industry-&-policy": {"bg": "#F8FAFC", "fg": "#475569"},
+        "capital": {"bg": "#FFFBEB", "fg": "#D97706"},
+        "business-&-capital": {"bg": "#FFFBEB", "fg": "#D97706"},
+        "💸-business-&-capital": {"bg": "#FFFBEB", "fg": "#D97706"}
+    }
+    
+    cfg = badge_colors.get(category, {"bg": "#F1F5F9", "fg": "#334155"})
+    style = f"display: inline-block; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; line-height: 1.25; border-radius: 4px; padding: 3px 7px; margin-right: 6px; margin-bottom: 4px; vertical-align: middle; background-color: {cfg['bg']}; color: {cfg['fg']};"
+    return f'<span class="pill" style="{style}">{label}</span>'
 
 
 def render_section_title(section_id, label):
-    return f'<h2 class="section-title">{label}</h2>\n'
+    return f'<h2 style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 800; color: #0F172A; margin: 35px 0 20px 0; border-bottom: 2px solid #F1F5F9; padding-bottom: 8px; text-align: left; text-transform: uppercase; letter-spacing: 0.05em;">{label}</h2>\n'
 
 
 def render_story_card(story, index, get_tag_badge, *, compact=False, show_category=False):
@@ -176,43 +193,43 @@ def render_story_card(story, index, get_tag_badge, *, compact=False, show_catego
 
     title_text = f"{index}. {story.get('title', 'Unknown')}"
     if source_url:
-        title_html = f"<a href='{source_url}'>{title_text}</a>"
+        title_html = f"<a href='{source_url}' style='color: #0F172A; text-decoration: none;'>{title_text}</a>"
     else:
         title_html = title_text
 
-    card_class = "story-card nugget-card" if compact else "story-card"
+    border_style = "none" if compact else "1px solid #F1F5F9"
+    padding_bottom = "0" if compact else "25px"
+    margin_bottom = "10px" if compact else "25px"
+    card_style = f"padding: 0 0 {padding_bottom}; border-bottom: {border_style}; margin-bottom: {margin_bottom}; background-color: #ffffff; text-align: left;"
 
     badges = "".join(b for b in (category_badge, badge_html) if b)
     badges_row = (
-        f'          <div class="story-title-badges">{badges}</div>\n' if badges else ""
+        f'          <div style="margin-bottom: 10px; padding: 0;">{badges}</div>\n' if badges else ""
     )
 
     html = f"""
-        <div class="{card_class}">
-          <div class="story-title">
-            <div class="story-title-text">{title_html}</div>
-{badges_row}          </div>
+        <div style="{card_style}">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 16.5px; font-weight: 700; color: #0F172A; margin: 0 0 8px 0; line-height: 1.4;">{title_html}</div>
+{badges_row}
 """
     html += f"""
-          <p class="story-body"><b>The News:</b> {story.get('news', '')}</p>
-          <p class="story-body"><b>The Impact:</b> {story.get('impact', '')}</p>
+          <p style="font-size: 14px; line-height: 1.65; color: #475569; margin: 0 0 8px 0;"><b>The News:</b> {story.get('news', '')}</p>
+          <p style="font-size: 14px; line-height: 1.65; color: #475569; margin: 0 0 8px 0;"><b>The Impact:</b> {story.get('impact', '')}</p>
 """
     
-
-
     tag_reason = story.get("tag_reason", "")
     if tag_reason:
-        html += f'          <div class="story-context">Context: {tag_reason}</div>\n'
+        html += f'          <div style="font-size: 11px; font-weight: 700; color: #4F46E5; margin: 6px 0; text-transform: uppercase; letter-spacing: 0.05em; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">Context: {tag_reason}</div>\n'
 
     contrarian_take = story.get("contrarian_take", "").strip()
     if contrarian_take and not compact:
         html += (
-            f'          <div class="contrarian-bullet">'
+            f'          <div style="margin-top: 14px; padding: 12px 16px; background-color: #FAF8F0; border-left: 4px solid #E5A93B; font-size: 13.5px; line-height: 1.6; color: #475569; font-style: italic; border-radius: 0 6px 6px 0;">'
             f"<b>Skeptic's Take:</b> {contrarian_take}</div>\n"
         )
     elif contrarian_take and compact:
         html += (
-            f'          <p class="story-body skeptic-take-compact">'
+            f'          <p style="font-size: 13px; margin-top: 8px; line-height: 1.65; color: #475569; margin: 0 0 8px 0;">'
             f"<b>Skeptic's Take:</b> {contrarian_take}</p>\n"
         )
 

@@ -19,12 +19,13 @@ from notifier import send_telegram_message, format_digest_for_telegram, format_w
 
 def get_tag_badge(tag):
     tag = tag.strip().upper()
+    style_base = "display: inline-block; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; line-height: 1.25; border-radius: 4px; padding: 3px 7px; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;"
     if 'NEW BREAK' in tag:
-        return '<span class="pill pill--new-break">New Break</span>'
+        return f'<span class="pill" style="{style_base} background-color: #EEF2FF; color: #4F46E5;">New Break</span>'
     if 'DEVELOPING' in tag:
-        return '<span class="pill pill--developing">Developing</span>'
+        return f'<span class="pill" style="{style_base} background-color: #F0FDF4; color: #16A34A;">Developing</span>'
     if 'CONTRADICTION' in tag:
-        return '<span class="pill pill--contradiction">Contradiction</span>'
+        return f'<span class="pill" style="{style_base} background-color: #FFF5F5; color: #EF4444;">Contradiction</span>'
     return ''
 
 
