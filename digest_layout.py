@@ -193,7 +193,7 @@ def render_story_card(story, index, get_tag_badge, *, compact=False, show_catego
 
     title_text = f"{index}. {story.get('title', 'Unknown')}"
     if source_url:
-        title_html = f"<a href='{source_url}' style='color: #0F172A; text-decoration: none;'>{title_text}</a>"
+        title_html = f"<a href='{source_url}' style='color: #0F172A; text-decoration: none;'>{title_text} <span style='color: #E5A93B; text-decoration: none; font-weight: normal;'>↗</span></a>"
     else:
         title_html = title_text
 
