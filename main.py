@@ -634,24 +634,14 @@ def main():
                 
             logging.info(f"WhatsApp channel content successfully saved in: {wa_file_path}")
             
-            # Automatically send the WhatsApp copy-paste markdown to the dedicated WhatsApp Markdowns Telegram channel
+            # Automatically send the WhatsApp copy-paste markdown as a file to the dedicated WhatsApp Markdowns Telegram channel
             from config import TELEGRAM_WHATSAPP_CHAT_ID
             from notifier import send_telegram_document
             if TELEGRAM_WHATSAPP_CHAT_ID:
-                logging.info(f"Sending WhatsApp Markdown copy block to dedicated Telegram channel: {TELEGRAM_WHATSAPP_CHAT_ID}")
-                
-                # Check if it fits in a single Telegram message (limit is 4096, using 4000 as safe threshold)
-                if len(whatsapp_messages) <= 4000:
-                    send_telegram_message("📝 <b>WHATSAPP CHANNEL COPY-PASTE FORMAT</b> 📝\n<i>(Tap/click the block below to copy)</i>", chat_id=TELEGRAM_WHATSAPP_CHAT_ID)
-                    time.sleep(1)
-                    escaped_msg = html.escape(whatsapp_messages)
-                    telegram_pre_msg = f"<pre>{escaped_msg}</pre>"
-                    send_telegram_message(telegram_pre_msg, chat_id=TELEGRAM_WHATSAPP_CHAT_ID)
-                else:
-                    # Message is too long, send as a text document attachment instead
-                    send_telegram_message("📝 <b>WHATSAPP CHANNEL COPY-PASTE FORMAT</b> 📝\n<i>(Digest exceeded Telegram's 4000-character limit. Sent as text file document below. Open and copy all)</i>", chat_id=TELEGRAM_WHATSAPP_CHAT_ID)
-                    time.sleep(1)
-                    send_telegram_document(wa_file_path, chat_id=TELEGRAM_WHATSAPP_CHAT_ID)
+                logging.info(f"Sending WhatsApp Markdown copy block file to dedicated Telegram channel: {TELEGRAM_WHATSAPP_CHAT_ID}")
+                send_telegram_message("📝 <b>WHATSAPP CHANNEL COPY-PASTE FORMAT</b> 📝\n<i>(Document file attachment below. Open and copy all)</i>", chat_id=TELEGRAM_WHATSAPP_CHAT_ID)
+                time.sleep(1)
+                send_telegram_document(wa_file_path, chat_id=TELEGRAM_WHATSAPP_CHAT_ID)
         except Exception as e:
             logging.error(f"Failed to generate or dispatch WhatsApp channel content: {e}")
 
