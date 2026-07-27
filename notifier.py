@@ -157,71 +157,75 @@ def format_weekly_deep_dive_for_telegram(deep_dive_data, date_str):
 
 
 def format_digest_for_whatsapp(digest_data, date_str):
-    """Formats the JSON digest data into a list of WhatsApp-optimized Markdown messages."""
+    """Formats the JSON digest data into a single WhatsApp-optimized Markdown message."""
     macro_themes = digest_data.get("macro_themes", [])
     top_stories = digest_data.get("top_stories", [])
     
-    messages = []
-    
-    # Message 1: Header + Macro Themes
-    msg1 = f"*📅 AI & Tech Daily Digest*\n"
-    msg1 += f"_📅 {date_str}_\n\n"
+    # Message header + Macro Themes
+    msg = f"*📅 AI & Tech Daily Digest*\n"
+    msg += f"_📅 {date_str}_\n\n"
     
     if macro_themes:
-        msg1 += f"*🔍 Macro Themes Analysis*\n\n"
+        msg += f"*🔍 Macro Themes Analysis*\n\n"
         for theme in macro_themes:
             theme_title = theme.get("theme_title", "Unnamed Theme")
             synthesis = theme.get("synthesis", "")
+            msg += f"• *{theme_title}*\n"
+            msg += f"  {synthesis}\n\n"
             
-            msg1 += f"• *{theme_title}*\n"
-            msg1 += f"  {synthesis}\n\n"
-            
-    messages.append(msg1.strip())
+    msg += "*🧠 Top Stories of the Day*\n\n"
     
     # Sort stories by importance rank
     sorted_stories = sorted(top_stories, key=lambda x: x.get('importance_rank', 99))
     
-    # Split stories into groups of 5
-    chunk_size = 5
-    for i in range(0, len(sorted_stories), chunk_size):
-        chunk = sorted_stories[i:i + chunk_size]
-        part_num = (i // chunk_size) + 1
-        total_parts = (len(sorted_stories) + chunk_size - 1) // chunk_size
+    for idx, story in enumerate(sorted_stories, 1):
+        title = story.get('title', 'Unknown Title')
+        tag = story.get('tag', '')
+        news = story.get('news', '')
+        impact = story.get('impact', '')
+        contrarian_take = story.get('contrarian_take', '').strip()
+        source_url = story.get('source_url', '')
         
-        msg_stories = f"*🧠 Top Stories of the Day (Part {part_num}/{total_parts})*\n\n"
+        # Format tag badge
+        tag_badge = ""
+        if "New Break" in tag:
+            tag_badge = "🟢 New Break"
+        elif "Developing" in tag:
+            tag_badge = "🔵 Developing"
+        elif "Contradiction" in tag:
+            tag_badge = "🔴 Contradiction"
+            
+        badge_str = f" [_{tag_badge}_]" if tag_badge else ""
+        link_str = f" ({source_url})" if source_url else ""
         
-        for idx, story in enumerate(chunk, i + 1):
-            title = story.get('title', 'Unknown Title')
-            tag = story.get('tag', '')
-            news = story.get('news', '')
-            impact = story.get('impact', '')
-            contrarian_take = story.get('contrarian_take', '').strip()
-            source_url = story.get('source_url', '')
-            
-            # Format tag badge
-            tag_badge = ""
-            if "New Break" in tag:
-                tag_badge = "🟢 New Break"
-            elif "Developing" in tag:
-                tag_badge = "🔵 Developing"
-            elif "Contradiction" in tag:
-                tag_badge = "🔴 Contradiction"
-                
-            badge_str = f" [_{tag_badge}_]" if tag_badge else ""
-            
-            # WhatsApp doesn't support HTML links, so we place raw link next to title
-            link_str = f" ({source_url})" if source_url else ""
-            
-            msg_stories += f"{idx}. *{title}*{badge_str}{link_str}\n"
-            msg_stories += f"• *The News:* {news}\n"
-            msg_stories += f"• *The Impact:* {impact}\n"
-            
-            if contrarian_take:
-                msg_stories += f"• *Skeptic's Take:* _{contrarian_take}_\n"
-                
-            msg_stories += "\n"
-            
-        messages.append(msg_stories.strip())
+        msg += f"{idx}. *{title}*{badge_str}{link_str}\n"
+        msg += f"• *The News:* {news}\n"
+        msg += f"• *The Impact:* {impact}\n"
         
-    return messages
+        if contrarian_take:
+            msg += f"• *Skeptic's Take:* _{contrarian_take}_\n"
+            
+        msg += "\n"
+        
+    return msg.strip()
+
+
+def send_telegram_document(file_path, chat_id=None):
+    """Sends a local file as a document to the configured Telegram chat/channel."""
+    target_chat_id = chat_id if chat_id else TELEGRAM_CHAT_ID
+    if not TELEGRAM_BOT_TOKEN or not target_chat_id:
+        logging.warning("Telegram credentials not found. Skipping Telegram document send.")
+        return
+        
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'document': f}
+            payload = {'chat_id': target_chat_id}
+            response = requests.post(url, data=payload, files=files)
+            response.raise_for_status()
+            logging.info("Telegram document sent successfully.")
+    except Exception as e:
+        logging.error(f"Failed to send Telegram document: {e}")
+
 
