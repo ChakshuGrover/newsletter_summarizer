@@ -46,7 +46,12 @@ class AISummarizer:
 - CRITICAL: Prioritize truly current events and news from the last 7 days. 
 - IGNORE historical recaps, long analytical essays reflecting on old deals, "looking back" sections, or background context unless there is a significant NEW development reported *today*.
 - If you are unsure if a piece of news is recent, err on the side of excluding it.
-- **LINKS (CRITICAL)**: For every single news event, tool, or story you summarize, if there is a URL provided in brackets [like this] anywhere in that section in the source text, you MUST preserve that exact URL in your summary. Make the key subject name, title, or key phrase a clickable link: `<a href="URL">Subject</a>`. Do NOT omit or lose these links; every reported fact should be link-rich if it was linked in the source."""
+- **LINKS (CRITICAL)**: For every single news event, tool, or story you summarize, if there is a URL provided in brackets [like this] anywhere in that section in the source text, you MUST preserve that exact URL in your summary. Make the key subject name, title, or key phrase a clickable link: `<a href="URL">Subject</a>`. Do NOT omit or lose these links; every reported fact should be link-rich if it was linked in the source.
+- **HUMAN-LIKE WRITING STANDARDS (CRITICAL)**:
+  * Do NOT use em dashes (`—` or `--`) under any circumstances to append details or make parenthetical remarks. Use standard commas, parentheses, or separate sentences instead.
+  * Strictly avoid AI jargon, filler, and transition buzzwords. BANNED words include: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize*.
+  * Vary your sentence structures. Never start consecutive bullet points with identical syntax (e.g. avoid starting multiple items with "Company X announced...", "X is a tool...", or "Y launched...").
+  * Ground the writing in plain, direct facts. Eliminate all marketing hype and promotional fluff (e.g., avoid "excited to announce", "paving the way", or "redefining the landscape")."""
 
     def _repair_json(self, raw_text):
         """Repair common JSON formatting issues from AI output."""
@@ -455,14 +460,17 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
        - 🟢 [New Break]: Entirely new developments.
        - 🔵 [Developing]: Significant updates to an ongoing storyline from the history.
        - 🔴 [Contradiction]: A pivot, reversal, or contradiction to a previous historical story.
-    - Ignore stories that are merely repetitions of history without significant updates.
-    - Provide "The News" (a concise summary) and "The Impact" (a 1-sentence explanation of why it matters to the industry).
-       - TONE: Write with the wit of Morning Brew and sharpness of Stratechery. Use vivid verbs, active voice, and avoid corporate jargon.
-       - ANALYTICAL OBJECTIVITY: In "The Impact" statement, do NOT make definitive future predictions or subjective value claims (e.g. do NOT write "sets a new benchmark"). Keep it grounded, analytical, and objective. Use soft qualifiers like "could become", "may set", or "is positioned to" rather than definitive declarations to protect credibility.
+    - TONE: Write with the wit of Morning Brew and sharpness of Stratechery. Use vivid verbs, active voice, and avoid corporate jargon.
+    - ANALYTICAL OBJECTIVITY: In "The Impact" statement, do NOT make definitive future predictions or subjective value claims. Keep it grounded, analytical, and objective. Use soft qualifiers like "could become", "may set", or "is positioned to" rather than definitive declarations to protect credibility.
+    - HUMAN-LIKE WRITING STANDARDS: 
+      * Do NOT use em dashes (— or --) under any circumstances in the titles, syntheses, news, or impact summaries. Use standard commas, parentheses, or separate sentences instead.
+      * Strictly avoid AI jargon, filler, and transition buzzwords. BANNED words include: delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize.
+      * Vary your sentence structures. Never start consecutive stories or themes with identical syntax.
+      * Ground the writing in plain, direct facts. Eliminate all marketing hype and promotional fluff.
     - For 🔵 [Developing] or 🔴 [Contradiction] stories, provide a ONE-LINE "Tag Reason" that explains exactly what it follows or contradicts from the history. If it is 🟢 [New Break], leave it empty.
-    - SOURCE NEWSLETTER SENDER: Identify the exact sender of the newsletter summary where this story was found (e.g., "AI Breakfast", "The Neuron", "TLDR AI"). Match it exactly to one of the Senders in the list below.
-    - OPTIONAL CONTRARIAN TAKE (STRICTLY MAX 3 STORIES): Act as a sharp, highly analytical tech skeptic. You must ONLY provide a 'contrarian_take' for at most 3 stories in the entire digest (specifically those that are highly hyped, controversial, or have major unaddressed risks). For all other stories, you MUST return an empty string "" in this field. Do not force generic boilerplate takes.
-    - UNIQUE NUGGETS: While prioritizing major trends, also capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter, ensuring no unique value is lost when individual summaries are removed.
+    - SOURCE NEWSLETTER SENDER: Identify the exact sender of the newsletter summary where this story was found.
+    - OPTIONAL CONTRARIAN TAKE (STRICTLY MAX 3 STORIES): Act as a sharp, highly analytical tech skeptic. You must ONLY provide a 'contrarian_take' for at most 3 stories in the entire digest (specifically those that are highly hyped, controversial, or have major unaddressed risks). For all other stories, you MUST return an empty string "" in this field.
+    - UNIQUE NUGGETS: Capture unique "nuggets" (e.g., a specific new tool, a niche model update, or a unique data point) that might only appear in a single newsletter.
     - STORY TIER: Assign each story exactly one tier (ensure total stories do not exceed 10):
        - "headline": The 1-2 most important tech/product/infrastructure stories of the day. Use extremely sparingly. (Do NOT assign "capital" stories to the headline tier).
        - "standard": Significant stories that belong in a themed section. Target 3-5 stories.
@@ -604,26 +612,32 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
         for i, item in enumerate(summaries):
             combined += f"Story {i+1}:\nSubject: {item['subject']}\nSummary: {item['summary_text']}\n\n"
  
-        prompt = f"""Act as a world-class LinkedIn ghostwriter. Using the newsletter summaries provided, generate 3 high-performance posts designed to maximize dwell time and engagement.
- 
-    **Engagement Framework:**
-    - **The Hook:** Start with a punchy first line (under 10 words).
-    - **The Body:** Use "The Slide" technique—short, punchy sentences. 1-2 emojis.
-    - **The CTA:** End with a low-friction question.
-    - **Visuals:** Prioritize white space.
- 
-    **Option Definitions:**
-    1. **The Contrarian Highlight:** Focus on the biggest story. Challenge the popular opinion.
-    2. **The "Too Busy To Read" Roundup:** "3 things you need to know today" format.
-    3. **The "So What?" Insight:** Connect a specific development to a bottom-line implication.
- 
-    **Hashtag Rule:** Include exactly 3 relevant hashtags at the end.
- 
+        prompt = f"""Act as a seasoned tech founder, engineering leader, and principal strategist (in the analytical style of Ben Thompson or a hands-on startup CTO). 
+        Write three highly authentic, insightful, and readable posts for a professional technical audience. 
+        Each post must be grounded directly in the provided newsletter summaries.
+
+    **Narrative Options (Generate exactly these 3 styles):**
+    1. **Option 1: The Technical Breakdown**: Select one significant technical development, product launch, or open-source release. Explain how it works, the engineering tradeoffs it resolves, and why it represents a real milestone, rather than just repeating marketing claims.
+    2. **Option 2: The Strategic Shift**: Analyze how multiple stories of the day connect to form a larger trend in industry dynamics, infrastructure investments, or competitive positioning (e.g. open source versus proprietary, developer tooling costs, hardware margins).
+    3. **Option 3: The Pragmatic Builder's Take**: Write from the perspective of an engineering team lead or founder evaluating today's news and deciding what has actual developer utility vs what is just noise.
+
+    **Critical Writing Rules:**
+    - **No "Broetry" Formatting**: Avoid single-sentence paragraphs spaced with blank lines. Write in normal, cohesive paragraphs (2-4 sentences per paragraph) with logical flow. You may use standard bulleted lists when outlining technical steps or facts, but do not structure the entire post as a line-by-line list.
+    - **Factual Grounding**: Ground the posts in the specific details, names, and numbers in the summaries. Do not write high-level, generic summaries.
+    - **Link Preservation**: For every link or URL provided in the summaries (e.g. `<a href="URL">Subject</a>` or standard bracketed links), you MUST extract and use the actual, real URL in your posts if you reference that story. Do NOT invent, hallucinate, or use generic placeholder URLs (like `github.com/example/tool` or `example.com`). If a story has no URL in the summaries, do not include any links for it.
+    - **Story Diversity (CRITICAL)**: The 3 options represent alternative draft posts for the day. To provide diverse options, do NOT focus all 3 posts on the same single news event. If there are multiple distinct stories in the summaries, Option 1 should focus on one technical story, Option 2 should synthesize a different set of stories, and Option 3 should focus on the developer utility of another distinct story. Provide varied angles and cover different developments across the posts.
+    - **Authentic Openers & Endings**: Do NOT use formulaic hooks (e.g., starting with fake statistics or cliché questions like "AI will not replace you, but...") and do NOT end with boilerplate, low-effort engagement questions (e.g., "What do you think?"). Open directly with an observation or story, and conclude naturally with a thoughtful strategic takeaway.
+    - **Tone**: Keep it conversational, sharp, technical, and objective. Speak like an expert engineer or business analyst, not a social media copywriter.
+    - **Emojis & Hashtags**: Use at most 1 emoji per post, only where natural. Include exactly 3 highly relevant hashtags at the very end of each post.
+
     **Formatting Rules (CRITICAL):**
-    - NO meta-text, labels (e.g., "Option 1"), or headers.
-    - NO introductory or concluding conversational filler.
+    - NO meta-text, option labels (e.g. do NOT include "Option 1" or "The Technical Breakdown" headers), or intro/outro conversational filler.
     - Separate the three options using exactly: |||POST_SEPARATOR|||
- 
+    - **HUMAN-LIKE WRITING STANDARDS (CRITICAL)**:
+      * Do NOT use em dashes (`—` or `--`) under any circumstances. Use standard commas, parentheses, or separate sentences instead.
+      * Strictly avoid AI jargon, filler, and transition buzzwords. BANNED words include: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize*.
+      * Ground the writing in plain, direct facts. Eliminate all marketing hype and promotional fluff.
+
     Summaries:
     {combined}"""
         
@@ -662,6 +676,11 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
         - Write in an authoritative, analytical, and highly engaging editorial voice. Vary sentence lengths for narrative rhythm.
         - Do NOT include any meta-introductions (like "Here is your deep dive...") or conclusions outside the essay.
         - Do NOT include any ASCII drawings, block diagrams, or text-based charts. Rely strictly on clean, descriptive text paragraphs, bold terms, and structured bullet lists to explain concepts. The essay must look clean and readable on narrow mobile screens (like Telegram).
+        - **HUMAN-LIKE WRITING STANDARDS (CRITICAL)**:
+          * Do NOT use em dashes (`—` or `--`) under any circumstances. Use standard commas, parentheses, or separate sentences instead.
+          * Strictly avoid AI jargon, filler, and transition buzzwords. BANNED words include: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize*.
+          * Vary your sentence structures. Keep paragraph openers natural and direct.
+          * Ground the writing in plain, direct facts. Eliminate all marketing hype and promotional fluff.
         
         **Output Format:**
         You MUST respond with ONLY valid JSON. Return a JSON object with EXACTLY these keys:

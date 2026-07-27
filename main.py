@@ -645,7 +645,25 @@ def main():
         except Exception as e:
             logging.error(f"Failed to generate or dispatch WhatsApp channel content: {e}")
 
-    # 8. Update state
+        # 8. LinkedIn Post Generation
+        try:
+            from config import TELEGRAM_LINKEDIN_CHAT_ID
+            if TELEGRAM_LINKEDIN_CHAT_ID:
+                logging.info("Generating LinkedIn post options...")
+                linkedin_posts = summarizer.generate_linkedin_posts(summaries)
+                if linkedin_posts:
+                    logging.info(f"Sending {len(linkedin_posts)} LinkedIn post options to Telegram channel: {TELEGRAM_LINKEDIN_CHAT_ID}")
+                    send_telegram_message("📢 <b>Daily LinkedIn Post Options</b> (Ready to Copy/Paste):", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
+                    time.sleep(1)
+                    for idx, post in enumerate(linkedin_posts, 1):
+                        send_telegram_message(f"<b>--- Option {idx} ---</b>\n\n{post}", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
+                        time.sleep(1)
+            else:
+                logging.warning("TELEGRAM_LINKEDIN_CHAT_ID is not configured. Skipping LinkedIn post generation.")
+        except Exception as e:
+            logging.error(f"Failed to generate or dispatch LinkedIn posts: {e}")
+
+    # 9. Update state
     if summaries and top_stories_data:
         with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
         logging.info("Main process complete. Run marked as processed.")
