@@ -37,6 +37,8 @@ def main():
     args = parser.parse_args()
 
     setup_logging()
+    summaries = []
+    top_stories_data = []
     logging.info(f"Starting main process with offset {args.days_offset}.")
     print(f"Heartbeat: Script triggered at {datetime.datetime.now()}")
 
@@ -196,10 +198,7 @@ def main():
 
     if summaries:
         # 5. Generate Insights and Digest
-        if (window_end - window_start).days <= 1:
-            date_range_str = window_end.strftime('%B %d, %Y')
-        else:
-            date_range_str = f"{window_start.strftime('%b %d')} - {window_end.strftime('%b %d, %Y')}"
+        date_range_str = window_end.strftime('%B %d, %Y')
         subject = f"AI & Tech Newsletters Digest - {date_range_str}"
         
         logging.info("Sleeping for 60 seconds to reset Token Per Minute (TPM) quota...")
@@ -210,6 +209,10 @@ def main():
         
         commentary_themes = digest_data.get("macro_themes", [])
         top_stories_data = digest_data.get("top_stories", [])
+        
+        if not top_stories_data:
+            logging.error("No top stories generated. This indicates a critical Gemini API quota or parsing issue. Aborting run without updating state to retry later.")
+            return
         
         html_body = f"""<!DOCTYPE html>
 <html>
@@ -605,9 +608,53 @@ def main():
         except Exception as e:
             logging.error(f"Failed to format or send Telegram channel messages: {e}")
 
-    # 7. Update state
-    with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
-    logging.info("Main process complete.")
+        # 7. WhatsApp Digest Generation (Retiring Instagram in favor of WhatsApp/Telegram)
+        try:
+            logging.info("Generating WhatsApp Channel Markdown content...")
+            from notifier import format_digest_for_whatsapp
+            whatsapp_messages = format_digest_for_whatsapp(digest_data, date_range_str)
+            
+            # Save WhatsApp formatted blocks to a file
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            wa_output_dir = os.path.join(base_dir, "archives", "whatsapp")
+            os.makedirs(wa_output_dir, exist_ok=True)
+            
+            wa_filename = f"digest_{date_str}.txt"
+            if args.force:
+                idx = 1
+                base_wa_file = f"digest_{date_str}_force"
+                wa_filename = f"{base_wa_file}.txt"
+                while os.path.exists(os.path.join(wa_output_dir, wa_filename)):
+                    wa_filename = f"{base_wa_file}_{idx}.txt"
+                    idx += 1
+            
+            wa_file_path = os.path.join(wa_output_dir, wa_filename)
+            with open(wa_file_path, 'w') as f:
+                f.write("\n\n=== SECTION DIVIDER ===\n\n".join(whatsapp_messages))
+                
+            logging.info(f"WhatsApp channel content successfully saved in: {wa_file_path}")
+            
+            # Automatically send the WhatsApp copy-paste markdown to the dedicated WhatsApp Markdowns Telegram channel
+            from config import TELEGRAM_WHATSAPP_CHAT_ID
+            if TELEGRAM_WHATSAPP_CHAT_ID:
+                logging.info(f"Sending WhatsApp Markdown copy block to dedicated Telegram channel: {TELEGRAM_WHATSAPP_CHAT_ID}")
+                send_telegram_message("📝 <b>WHATSAPP CHANNEL COPY-PASTE FORMAT</b> 📝\n<i>(Tap/click the blocks below to copy)</i>", chat_id=TELEGRAM_WHATSAPP_CHAT_ID)
+                time.sleep(1)
+                for msg in whatsapp_messages:
+                    # Wrap message in <pre>...</pre> to make it monospaced and single-tap copyable on Telegram
+                    escaped_msg = html.escape(msg)
+                    telegram_pre_msg = f"<pre>{escaped_msg}</pre>"
+                    send_telegram_message(telegram_pre_msg, chat_id=TELEGRAM_WHATSAPP_CHAT_ID)
+                    time.sleep(1)
+        except Exception as e:
+            logging.error(f"Failed to generate or dispatch WhatsApp channel content: {e}")
+
+    # 8. Update state
+    if summaries and top_stories_data:
+        with open(LAST_RUN_FILE, 'w') as f: f.write(target_date_str)
+        logging.info("Main process complete. Run marked as processed.")
+    else:
+        logging.warning("Pipeline completed with empty summaries or top stories. Last run state NOT updated to allow future retries.")
 
 if __name__ == '__main__':
     main()
