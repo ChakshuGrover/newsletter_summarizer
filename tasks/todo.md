@@ -552,3 +552,19 @@ The Sharp Analyst tone configuration has been successfully implemented and verif
 1. **Prompt Constraints Refined**: Updated `generate_linkedin_posts` rules in [ai_summarizer.py](file:///Users/chakshugrover/newsletter_summarizer/ai_summarizer.py) to require active, opinionated hooks under 15 words, enforce active verbs/voice, and explicitly ban dry textbook setups.
 2. **Verified Output**: Re-ran the test script and confirmed that all 3 options now open with strong, punchy statements and flow logically like a Stratechery analysis or startup CTO's take rather than a clinical report.
 
+---
+
+# Task: Resolve Broken Links and Filter Old News in Digests
+
+The goal is to ensure tracking/redirect links (like Substack redirect links) are resolved to their final clean destination URLs and that stories older than 4 days are strictly filtered out of the top stories list.
+
+## Todo List
+
+- [ ] **Phase 1: Update Redirect Resolver for Substack**
+  - [ ] Add Substack redirect URLs (`substack.com/redirect`, `substack.com/app-link`) to `resolve_redirects` in [utils.py](file:///Users/chakshugrover/newsletter_summarizer/utils.py).
+  - [ ] Configure `resolve_redirects` to use a simple User-Agent (`Mozilla/5.0`) for Substack links to bypass Cloudflare challenges and retrieve clean HTTP 302 redirects.
+- [ ] **Phase 2: Strengthen Recentness Guidelines**
+  - [ ] Add strict recentness guidelines to the daily digest prompt in [ai_summarizer.py](file:///Users/chakshugrover/newsletter_summarizer/ai_summarizer.py) to explicitly filter out events older than 4 days.
+- [ ] **Phase 3: Verification & Execution**
+  - [ ] Verify that Substack app redirects resolve to direct target URLs.
+  - [ ] Merge code and run a manual pipeline execution to verify that links are clean and old news is filtered.

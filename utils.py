@@ -5,11 +5,13 @@ from bs4 import BeautifulSoup
 
 def resolve_redirects(url):
     """Resolve tracking links to their final destination URL using a browser User-Agent."""
-    redirectors = ['link.mail', 'click.mail', 't.mail', 'tracking.tldrnewsletter.com', 'ben-evans.us6.list-manage.com', 'alphasignal.ai']
+    redirectors = ['link.mail', 'click.mail', 't.mail', 'tracking.tldrnewsletter.com', 'ben-evans.us6.list-manage.com', 'alphasignal.ai', 'substack.com/redirect', 'substack.com/app-link']
     if any(d in url.lower() for d in redirectors):
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+        headers = {}
+        if 'substack.com' in url.lower():
+            headers['User-Agent'] = 'Mozilla/5.0'  # Simple UA triggers clean HTTP 302 redirect
+        else:
+            headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         try:
             # Many tracking servers require a GET request to process the redirect properly
             response = requests.get(url, allow_redirects=True, timeout=5, headers=headers)

@@ -482,9 +482,9 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     
     **CRITICAL RECENTNESS & GROUNDING RULES:**
     1. ONLY identify stories that are reported as NEW or DEVELOPING breaking news within the provided summaries.
-    2. IGNORE analytical essays, historical recaps, deep dives into old news, or "looking back" sections.
+    2. IGNORE analytical essays, historical recaps, weekly summaries of older news, or "looking back" sections.
     3. Ensure every story is grounded in a specific, recent factual event reported in the provided newsletter summaries.
-    4. VERIFY RECENTNESS: If the text describes an event in the past tense without a specific recent date, EXCLUDE it.
+    4. STRICT RECENTNESS FILTER: If a story describes an event that took place, was announced, or broke more than 4 days ago, or is a recap of older events from the past week, you MUST exclude it. Focus exclusively on active, fresh news that broke within the last 72 hours.
  
     **Recent History Context (Last 30 Days):**
     {json.dumps(history_context, indent=2)}
