@@ -532,3 +532,23 @@ The story diversity configuration has been successfully implemented and verified
 2. **Verified Test Execution**: Expanded the dry-run test suite to ingest 3 distinct stories (Google SDK release, Microsoft/OpenAI $100B Stargate data center plan, and HackerNews model server RCE vulnerability).
 3. **Confirmed Output**: Verified that the generated LinkedIn drafts now target completely different stories, angles, and targets—creating three completely distinct, high-quality, and useful options for user selection.
 
+---
+
+# Task: Refine LinkedIn Prompt for Sharp Analyst (Stratechery) Tone
+
+The goal is to update the LinkedIn generation prompt's writing rules in `ai_summarizer.py` to ban clinical, textbook economic summaries ("market dynamics are shifting") and push the model to adopt a sharp, conversational analyst voice with active verbs and opinionated openers.
+
+## Todo List
+
+- [x] **Phase 1: Update Prompt Tone Guidelines**
+  - [x] Refine the `Authentic Openers & Endings` rule in `generate_linkedin_posts` in [ai_summarizer.py](file:///Users/chakshugrover/newsletter_summarizer/ai_summarizer.py) to require active, opinionated hooks under 15 words.
+  - [x] Refine the `Tone` rule to mandate active voice/verbs and explicitly ban academic/clinical phrasing.
+- [x] **Phase 2: Verify and Test Output**
+  - [x] Execute the test runner and verify that the generated strategic shift option sounds like a sharp strategic analyst talking directly to peers.
+
+## Review: LinkedIn Analyst Tone Refinement Results
+
+The Sharp Analyst tone configuration has been successfully implemented and verified:
+1. **Prompt Constraints Refined**: Updated `generate_linkedin_posts` rules in [ai_summarizer.py](file:///Users/chakshugrover/newsletter_summarizer/ai_summarizer.py) to require active, opinionated hooks under 15 words, enforce active verbs/voice, and explicitly ban dry textbook setups.
+2. **Verified Output**: Re-ran the test script and confirmed that all 3 options now open with strong, punchy statements and flow logically like a Stratechery analysis or startup CTO's take rather than a clinical report.
+
