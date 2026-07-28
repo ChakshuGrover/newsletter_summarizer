@@ -605,34 +605,36 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
         except Exception as e:
             logging.error(f"Error generating digest data: {e}")
             return {"macro_themes": [], "top_stories": []}
- 
+
     def generate_linkedin_posts(self, summaries):
-        # Restored the full, high-quality LinkedIn prompt from original
+        """Generates 5 distinct algorithm-optimized LinkedIn post options based on daily news summaries."""
         combined = ""
         for i, item in enumerate(summaries):
             combined += f"Story {i+1}:\nSubject: {item['subject']}\nSummary: {item['summary_text']}\n\n"
- 
+
         prompt = f"""Act as a seasoned tech founder, engineering leader, and principal strategist (in the analytical style of Ben Thompson or a hands-on startup CTO). 
-        Write three highly authentic, insightful, and readable posts for a professional technical audience. 
+        Write FIVE highly authentic, insightful, and readable posts for a professional technical audience on LinkedIn. 
         Each post must be grounded directly in the provided newsletter summaries.
 
-    **Narrative Options (Generate exactly these 3 styles):**
+    **Narrative Options (Generate exactly these 5 styles):**
     1. **Option 1: The Technical Breakdown**: Select one significant technical development, product launch, or open-source release. Explain how it works, the engineering tradeoffs it resolves, and why it represents a real milestone, rather than just repeating marketing claims.
     2. **Option 2: The Strategic Shift**: Analyze how multiple stories of the day connect to form a larger trend in industry dynamics, infrastructure investments, or competitive positioning (e.g. open source versus proprietary, developer tooling costs, hardware margins).
     3. **Option 3: The Pragmatic Builder's Take**: Write from the perspective of an engineering team lead or founder evaluating today's news and deciding what has actual developer utility vs what is just noise.
+    4. **Option 4: The 5-Slide PDF Carousel Outline**: Structure this post as a slide-by-slide text template ready to convert into a 5-slide PDF Carousel (Slide 1: Hook Title -> Slide 2: Context & Problem -> Slide 3: Technical Shift -> Slide 4: Industry Impact -> Slide 5: Takeaway). Formatted clearly with [Slide 1], [Slide 2], etc.
+    5. **Option 5: The Pattern Interrupt / Discussion Starter**: Open with a bold, contrarian, or counter-intuitive observation about today's news that challenges conventional wisdom. Frame a sharp, opinionated perspective that invites thoughtful debate in the comment section.
 
-    **Critical Writing Rules:**
-    - **No "Broetry" Formatting**: Avoid single-sentence paragraphs spaced with blank lines. Write in normal, cohesive paragraphs (2-4 sentences per paragraph) with logical flow. You may use standard bulleted lists when outlining technical steps or facts, but do not structure the entire post as a line-by-line list.
+    **Critical Writing & Reach Rules:**
+    - **"See-More" Fold Hook**: The first 1-2 sentences (under 15 words) of every post MUST be a sharp, high-curiosity pattern interrupt designed to make users click "...see more".
+    - **No Outbound Link Penalty**: Do NOT place raw external URLs inside the main post body text (LinkedIn suppresses post reach for outbound links). If referencing a source or link, append `(Link in comments)` instead.
+    - **No "Broetry" Formatting**: Avoid single-sentence paragraphs spaced with blank lines. Write in normal, cohesive paragraphs (2-4 sentences per paragraph) with logical flow. You may use standard bulleted lists when outlining technical steps or facts.
     - **Factual Grounding**: Ground the posts in the specific details, names, and numbers in the summaries. Do not write high-level, generic summaries.
-    - **Link Preservation**: For every link or URL provided in the summaries (e.g. `<a href="URL">Subject</a>` or standard bracketed links), you MUST extract and use the actual, real URL in your posts if you reference that story. Do NOT invent, hallucinate, or use generic placeholder URLs (like `github.com/example/tool` or `example.com`). If a story has no URL in the summaries, do not include any links for it.
-    - **Story Diversity (CRITICAL)**: The 3 options represent alternative draft posts for the day. To provide diverse options, do NOT focus all 3 posts on the same single news event. If there are multiple distinct stories in the summaries, Option 1 should focus on one technical story, Option 2 should synthesize a different set of stories, and Option 3 should focus on the developer utility of another distinct story. Provide varied angles and cover different developments across the posts.
-    - **Authentic Openers & Endings**: Do NOT use formulaic hooks (e.g. starting with fake statistics or cliché questions) or clinical, textbook descriptions (like "The market dynamics are shifting"). Open directly with an active, opinionated statement (under 15 words) about the real implication of the news. Do NOT end with boilerplate, low-effort engagement questions (like "What do you think?"). Conclude naturally with a thoughtful strategic takeaway or industry prediction.
-    - **Tone**: Keep it conversational, sharp, technical, and objective (the analytical style of Ben Thompson/Stratechery or an opinionated CTO talking to peers). Use active verbs and active voice. Avoid academic/clinical economics textbook jargon. Instead of "This margin compression is forcing proprietary AI providers to seek...", write "This margin squeeze forces proprietary labs to...". Keep it punchy and direct.
+    - **Story Diversity (CRITICAL)**: The 5 options represent alternative draft posts for the day. Provide varied angles and cover different developments across the 5 options so they do not all focus on the exact same single story.
+    - **Tone**: Keep it conversational, sharp, technical, and objective (the analytical style of Ben Thompson/Stratechery or an opinionated CTO talking to peers). Use active verbs and active voice.
     - **Emojis & Hashtags**: Use at most 1 emoji per post, only where natural. Include exactly 3 highly relevant hashtags at the very end of each post.
 
     **Formatting Rules (CRITICAL):**
     - NO meta-text, option labels (e.g. do NOT include "Option 1" or "The Technical Breakdown" headers), or intro/outro conversational filler.
-    - Separate the three options using exactly: |||POST_SEPARATOR|||
+    - Separate the FIVE options using exactly: |||POST_SEPARATOR|||
     - **HUMAN-LIKE WRITING STANDARDS (CRITICAL)**:
       * Do NOT use em dashes (`—` or `--`) under any circumstances. Use standard commas, parentheses, or separate sentences instead.
       * Strictly avoid AI jargon, filler, and transition buzzwords. BANNED words include: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize*.
@@ -649,7 +651,7 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
                 )
             )
             if not resp or not resp.text: return []
- 
+
             return [p.strip() for p in resp.text.split("|||POST_SEPARATOR|||") if p.strip()]
         except Exception as e:
             logging.error(f"Error generating LinkedIn posts: {e}")

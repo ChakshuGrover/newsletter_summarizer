@@ -649,14 +649,25 @@ def main():
         try:
             from config import TELEGRAM_LINKEDIN_CHAT_ID
             if TELEGRAM_LINKEDIN_CHAT_ID:
-                logging.info("Generating LinkedIn post options...")
+                logging.info("Generating 5 LinkedIn post options...")
                 linkedin_posts = summarizer.generate_linkedin_posts(summaries)
                 if linkedin_posts:
                     logging.info(f"Sending {len(linkedin_posts)} LinkedIn post options to Telegram channel: {TELEGRAM_LINKEDIN_CHAT_ID}")
-                    send_telegram_message("📢 <b>Daily LinkedIn Post Options</b> (Ready to Copy/Paste):", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
+                    send_telegram_message("📢 <b>Daily LinkedIn Post Options</b> (Ready to Copy/Paste):\n<i>(Tap/click a block below to copy)</i>", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
                     time.sleep(1)
+                    
+                    option_titles = [
+                        "Option 1: The Technical Breakdown",
+                        "Option 2: The Strategic Shift",
+                        "Option 3: The Pragmatic Builder's Take",
+                        "Option 4: The 5-Slide PDF Carousel Outline",
+                        "Option 5: The Pattern Interrupt / Discussion Starter"
+                    ]
+                    
                     for idx, post in enumerate(linkedin_posts, 1):
-                        send_telegram_message(f"<b>--- Option {idx} ---</b>\n\n{post}", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
+                        title = option_titles[idx-1] if idx <= len(option_titles) else f"Option {idx}"
+                        escaped_post = html.escape(post)
+                        send_telegram_message(f"<b>--- {title} ---</b>\n<pre>{escaped_post}</pre>", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
                         time.sleep(1)
             else:
                 logging.warning("TELEGRAM_LINKEDIN_CHAT_ID is not configured. Skipping LinkedIn post generation.")
