@@ -560,11 +560,21 @@ The goal is to ensure tracking/redirect links (like Substack redirect links) are
 
 ## Todo List
 
-- [ ] **Phase 1: Update Redirect Resolver for Substack**
-  - [ ] Add Substack redirect URLs (`substack.com/redirect`, `substack.com/app-link`) to `resolve_redirects` in [utils.py](file:///Users/chakshugrover/newsletter_summarizer/utils.py).
-  - [ ] Configure `resolve_redirects` to use a simple User-Agent (`Mozilla/5.0`) for Substack links to bypass Cloudflare challenges and retrieve clean HTTP 302 redirects.
-- [ ] **Phase 2: Strengthen Recentness Guidelines**
-  - [ ] Add strict recentness guidelines to the daily digest prompt in [ai_summarizer.py](file:///Users/chakshugrover/newsletter_summarizer/ai_summarizer.py) to explicitly filter out events older than 4 days.
-- [ ] **Phase 3: Verification & Execution**
-  - [ ] Verify that Substack app redirects resolve to direct target URLs.
-  - [ ] Merge code and run a manual pipeline execution to verify that links are clean and old news is filtered.
+- [x] **Phase 1: Update Redirect Resolver for Substack**
+  - [x] Add Substack redirect URLs (`substack.com/redirect`, `substack.com/app-link`) to `resolve_redirects` in [utils.py](file:///Users/chakshugrover/newsletter_summarizer/utils.py).
+  - [x] Configure `resolve_redirects` to use a simple User-Agent (`Mozilla/5.0`) for Substack links to bypass Cloudflare challenges and retrieve clean HTTP 302 redirects.
+- [x] **Phase 2: Strengthen Recentness Guidelines**
+  - [x] Add strict recentness guidelines to the daily digest prompt in [ai_summarizer.py](file:///Users/chakshugrover/newsletter_summarizer/ai_summarizer.py) to explicitly filter out events older than 4 days.
+- [x] **Phase 3: Verification & Execution**
+  - [x] Verify that Substack app redirects resolve to direct target URLs.
+  - [x] Merge code and run a manual pipeline execution to verify that links are clean and old news is filtered.
+
+## Review: Link Resolution & Recentness Filtering Results
+
+All link-resolution and recentness updates have been successfully completed and validated on live production data:
+1. **Redirect Resolution**: Configured [utils.py](file:///Users/chakshugrover/newsletter_summarizer/utils.py) to detect Substack redirect paths and fetch them using a simple `Mozilla/5.0` User-Agent. Verified that this successfully bypasses Cloudflare validation and resolves Substack app-links directly to clean, direct web destination URLs.
+2. **Stricter Recentness**: Enhanced the recentness guidelines in [ai_summarizer.py](file:///Users/chakshugrover/newsletter_summarizer/ai_summarizer.py)'s daily digest prompt to strictly filter out weekly summaries or events older than 4 days.
+3. **Verified Output**: Ran a manual pipeline execution using today's live newsletters. Confirmed that:
+   * The broken Substack link in Story 3 resolved cleanly to its real GitHub destination page (`github.com/epoch-research/MirrorCode`).
+   * The old news (the tech open-weights petition from last week) was successfully filtered out, replaced by a fresh Apple wearable release.
+
