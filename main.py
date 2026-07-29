@@ -664,11 +664,27 @@ def main():
                         "Option 5: The Pattern Interrupt / Discussion Starter"
                     ]
                     
-                    for idx, post in enumerate(linkedin_posts, 1):
+                    for idx, raw_post in enumerate(linkedin_posts, 1):
                         title = option_titles[idx-1] if idx <= len(option_titles) else f"Option {idx}"
-                        escaped_post = html.escape(post)
+                        
+                        # Extract SOURCE_LINK if appended
+                        source_url = None
+                        post_body = raw_post
+                        if "SOURCE_LINK:" in raw_post:
+                            parts = raw_post.split("SOURCE_LINK:")
+                            post_body = parts[0].strip()
+                            possible_url = parts[1].strip()
+                            if possible_url.startswith("http"):
+                                source_url = possible_url
+                                
+                        escaped_post = html.escape(post_body)
                         send_telegram_message(f"<b>--- {title} ---</b>\n<pre>{escaped_post}</pre>", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
                         time.sleep(1)
+                        
+                        if source_url:
+                            escaped_url = html.escape(source_url)
+                            send_telegram_message(f"🔗 <b>Link for comment:</b>\n<pre>{escaped_url}</pre>", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
+                            time.sleep(1)
             else:
                 logging.warning("TELEGRAM_LINKEDIN_CHAT_ID is not configured. Skipping LinkedIn post generation.")
         except Exception as e:

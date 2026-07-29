@@ -665,6 +665,7 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     **Formatting Rules (CRITICAL):**
     - NO meta-text, option labels (e.g. do NOT include "Option 1" headers), or conversational filler.
     - Separate the FIVE options using exactly: |||POST_SEPARATOR|||
+    - At the very end of each post option (after hashtags and (Link in comments)), append on a new line: `SOURCE_LINK: <actual_primary_url_from_summaries>` (or `SOURCE_LINK: None` if no URL is present).
     - **HUMAN-LIKE WRITING STANDARDS (CRITICAL)**:
       * Do NOT use em dashes (`—` or `--`) under any circumstances. Use commas, parentheses, or separate sentences.
       * Strictly avoid AI jargon and filler words. BANNED: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize, systematically, decoupling*.
