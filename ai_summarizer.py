@@ -665,12 +665,24 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     {combined}"""
         
         try:
-            resp = self.retry_with_backoff(
-                lambda: self.model.generate_content(
-                    prompt, 
-                    generation_config={"temperature": 0.5}
+            # Enable Google Search Grounding exclusively for LinkedIn post generation
+            try:
+                search_model = genai.GenerativeModel('gemini-3.6-flash', tools='google_search_retrieval')
+                resp = self.retry_with_backoff(
+                    lambda: search_model.generate_content(
+                        prompt, 
+                        generation_config={"temperature": 0.5}
+                    )
                 )
-            )
+            except Exception as search_err:
+                logging.warning(f"Google Search Grounding failed for LinkedIn posts ({search_err}), falling back to standard model.")
+                resp = self.retry_with_backoff(
+                    lambda: self.model.generate_content(
+                        prompt, 
+                        generation_config={"temperature": 0.5}
+                    )
+                )
+
             if not resp or not resp.text: return []
 
             return [p.strip() for p in resp.text.split("|||POST_SEPARATOR|||") if p.strip()]
