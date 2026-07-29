@@ -30,6 +30,7 @@ Does granting $5 billion in compute to pre-product labs accelerate technical bre
 ```
 
 ### Guidelines Learned:
-1. **Human Conversational Openers (NO Academic Jargon)**: Never start posts with dense, textbook jargon ("Hardware vendors are systematically eating software distribution channels..."). Write like a real human founder/engineer talking directly to peers ("Nvidia is officially replacing venture capital with raw GPU compute lines.").
-2. **Anti-PR / No Advertorials**: Never write posts that sound like a press release or product advertisement for tech giants ("Microsoft just released X..."). Focus on the engineering tradeoff, architectural insight, or real developer decision.
-3. **Contrast Architecture**: Always contrast *How things used to work* vs *What is happening now* to build narrative momentum.
+1. **Nvidia Compute Deals as a Pattern ("Circular Financing")**: Nvidia's GPU-as-capital deals (SSI, CoreWeave, Inflection, Mistral, Cohere, Lambda) form a broader trend where chipmakers trade hardware allocation for equity/debt. When writing market analysis, reference this recurring pattern ("circular financing" / compute-as-capital).
+2. **Human Conversational Openers (NO Academic Jargon)**: Never start posts with dense, textbook jargon ("Hardware vendors are systematically eating software distribution channels..."). Write like a real human founder/engineer talking directly to peers ("Nvidia is officially replacing venture capital with raw GPU compute lines.").
+3. **Anti-PR / No Advertorials**: Never write posts that sound like a press release or product advertisement for tech giants ("Microsoft just released X..."). Focus on the engineering tradeoff, architectural insight, or real developer decision.
+4. **Contrast Architecture**: Always contrast *How things used to work* vs *What is happening now* to build narrative momentum.
