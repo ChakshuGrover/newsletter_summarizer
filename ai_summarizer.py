@@ -623,14 +623,15 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     4. **Option 4: The 5-Slide PDF Carousel Strategy Outline**: Formatted as a 5-slide text template for a LinkedIn PDF Carousel (Slide 1: Hook Title -> Slide 2: Structural Context -> Slide 3: Engineering/Market Shift -> Slide 4: Strategic Impact -> Slide 5: Takeaway). Formatted with [Slide 1], [Slide 2], etc.
     5. **Option 5: The Contrarian Pattern Interrupt**: Open with a bold, counter-intuitive thesis that challenges popular tech consensus, driving a high-value discussion in the comments.
 
-    **CRITICAL ANTI-ADVERTISING & WRITING RULES:**
+    **CRITICAL ANTI-ADVERTISING & HUMAN HOOK RULES:**
+    - **NATURAL HUMAN OPENERS (NO ACADEMIC JARGON)**: NEVER start posts with dense, robotic, or textbook economics jargon (BANNED: "Hardware vendors are systematically eating software distribution channels...", "Capital allocation strategies are decoupling from standard SaaS operational playbooks...", "Systemic market dynamics are shifting..."). Write the opening line using simple, direct, active English that a real founder or CTO would say out loud to a peer (e.g. "Hardware companies are taking over the AI stack. The old SaaS playbook is dead.").
     - **STRICTLY NO PR OR ADVERTORIAL TONE (BANNED)**: Do NOT write posts that sound like product announcements, press releases, or marketing pitches (e.g. NEVER start or structure a post like "Microsoft just released X model designed explicitly to solve Y"). Write as an independent analyst or CTO sharing strategic principles, not as a PR megaphone for tech vendors.
-    - **"See-More" Fold Hook**: The first 1-2 sentences (under 15 words) of every post MUST be a sharp, high-curiosity pattern interrupt designed to make users click "...see more".
+    - **"See-More" Fold Hook**: The first 1-2 sentences (under 12 words) of every post MUST be a sharp, natural pattern interrupt designed to make users click "...see more".
     - **No Outbound Link Penalty**: Do NOT place raw external URLs inside the main post body text (LinkedIn suppresses post reach for outbound links). Append `(Link in comments)` at the end instead.
     - **No "Broetry" Formatting**: Write in clean, cohesive paragraphs (2-4 sentences per paragraph) with logical flow. Avoid single-sentence line-by-line spam.
     - **Factual Grounding**: Ground the posts in real technical facts, numbers, and names from the summaries without fluff.
     - **Story Diversity**: Ensure the 5 options explore distinct stories and diverse angles across the summaries.
-    - **Tone**: Conversational, sharp, technical, and objective (Stratechery / CTO talking to peers). Use active verbs and active voice.
+    - **Tone**: Conversational, sharp, technical, and human (Stratechery / CTO talking to peers). Use active verbs and active voice.
     - **Emojis & Hashtags**: Use at most 1 emoji per post. Include exactly 3 relevant hashtags at the very end.
 
     **Formatting Rules (CRITICAL):**
@@ -638,7 +639,7 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     - Separate the FIVE options using exactly: |||POST_SEPARATOR|||
     - **HUMAN-LIKE WRITING STANDARDS (CRITICAL)**:
       * Do NOT use em dashes (`—` or `--`) under any circumstances. Use commas, parentheses, or separate sentences.
-      * Strictly avoid AI jargon and filler words. BANNED: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize*.
+      * Strictly avoid AI jargon and filler words. BANNED: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize, systematically, decoupling*.
 
     Summaries:
     {combined}"""

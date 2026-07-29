@@ -9,6 +9,7 @@
 - **Resolution**: Filter out events older than 4 days, focusing on news that broke within 72 hours.
 
 ## LinkedIn Reach & Content Quality (CRITICAL)
-- **Anti-PR / No Advertorials**: Never write posts that sound like a press release or product advertisement for tech giants ("Microsoft just released X...", "Company Y solves Z"). Instead of promoting product launches, focus on the engineering tradeoff, architectural insight, or real developer decision.
+- **Human Conversational Openers (NO Clinical Academic Jargon)**: Never start posts with dense, textbook jargon like "Hardware vendors are systematically eating software distribution channels..." or "Capital allocation strategies are decoupling...". Write like a real human engineer/founder talking directly to peers—use simple, punchy, active English ("Hardware companies are taking over the AI stack. The old SaaS playbook doesn't work anymore.").
+- **Anti-PR / No Advertorials**: Never write posts that sound like a press release or product advertisement for tech giants ("Microsoft just released X...", "Company Y solves Z"). Focus on the engineering tradeoff, architectural insight, or real developer decision.
 - **Preferred Persona & Style**: High-level structural market & engineering analysis (Ben Thompson / Stratechery style). Content analyzing capital allocation, hardware vs software incentives, open-source economics, and infrastructure bottlenecks is heavily preferred by the user.
-- **Content Freshness**: Vary daily themes so consecutive daily runs don't repeat the same macro narrative angle (e.g. if hardware vs closed-lab split was posted yesterday, pivot to developer tooling economics or model compression tradeoffs today).
+- **Content Freshness**: Vary daily themes so consecutive daily runs don't repeat the same macro narrative angle.
