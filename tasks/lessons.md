@@ -9,7 +9,27 @@
 - **Resolution**: Filter out events older than 4 days, focusing on news that broke within 72 hours.
 
 ## LinkedIn Reach & Content Quality (CRITICAL)
-- **Human Conversational Openers (NO Clinical Academic Jargon)**: Never start posts with dense, textbook jargon like "Hardware vendors are systematically eating software distribution channels..." or "Capital allocation strategies are decoupling...". Write like a real human engineer/founder talking directly to peers—use simple, punchy, active English ("Hardware companies are taking over the AI stack. The old SaaS playbook doesn't work anymore.").
-- **Anti-PR / No Advertorials**: Never write posts that sound like a press release or product advertisement for tech giants ("Microsoft just released X...", "Company Y solves Z"). Focus on the engineering tradeoff, architectural insight, or real developer decision.
-- **Preferred Persona & Style**: High-level structural market & engineering analysis (Ben Thompson / Stratechery style). Content analyzing capital allocation, hardware vs software incentives, open-source economics, and infrastructure bottlenecks is heavily preferred by the user.
-- **Content Freshness**: Vary daily themes so consecutive daily runs don't repeat the same macro narrative angle.
+
+### Gold Standard Post Exemplar (USER APPROVED)
+> **Hook**: Bold, simple, spoken statement (<12 words) without academic fluff.  
+> **Body**: Concrete numbers/facts -> Contrast traditional thinking with new reality -> Clear strategic implication.  
+> **Ending**: High-friction open question sparking industry debate.
+
+**Approved Example**:
+```text
+Nvidia is officially replacing venture capital with raw GPU compute lines.
+
+Safe Superintelligence just secured a compute commitment from Nvidia valued at up to $5 billion. This deal gives a pre-product research lab direct access to Nvidia's upcoming Vera Rubin GPU architecture without a commercial product on the market.
+
+Traditional venture capital evaluated user traction, unit economics, and early revenue metrics. Today, chipmakers bypass traditional equity structures by allocating physical compute resources directly to research teams based entirely on founder pedigree.
+
+Does granting $5 billion in compute to pre-product labs accelerate technical breakthroughs, or does it distort market dynamics by picking winners before product validation? Drop your perspective below. 📉
+
+(Link in comments)
+#VentureCapital #Semiconductors #Startups
+```
+
+### Guidelines Learned:
+1. **Human Conversational Openers (NO Academic Jargon)**: Never start posts with dense, textbook jargon ("Hardware vendors are systematically eating software distribution channels..."). Write like a real human founder/engineer talking directly to peers ("Nvidia is officially replacing venture capital with raw GPU compute lines.").
+2. **Anti-PR / No Advertorials**: Never write posts that sound like a press release or product advertisement for tech giants ("Microsoft just released X..."). Focus on the engineering tradeoff, architectural insight, or real developer decision.
+3. **Contrast Architecture**: Always contrast *How things used to work* vs *What is happening now* to build narrative momentum.
