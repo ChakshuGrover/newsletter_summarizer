@@ -10,22 +10,22 @@
 
 ## LinkedIn Reach & Content Quality (CRITICAL)
 
-### Masterpiece Gold Standard Post Exemplar (USER DEFINED & APPROVED)
+### Masterpiece Gold Standard Post Exemplar (ZERO EM DASHES)
 > **Hook**: Intrigue-driven, elegant, spoken statement (<10 words) without academic jargon.  
 > **Deal Precision**: Reported equity investment + unreleased GPU platform access -> Concrete "order of magnitude" compute result.  
 > **Precedents**: Bulleted list of historical pattern examples (CoreWeave, Inflection, Mistral).  
 > **Contrast**: Traditional VC criteria vs modern chipmaker direct deployment based on pedigree & mission alone.  
 > **Closing**: Ecosystem question header -> Thoughtful open debate prompt -> Downward finger emoji CTA (`👇`).
 
-**Masterpiece Approved Exemplar**:
+**Masterpiece Approved Exemplar (Cleaned)**:
 ```text
 Nvidia is quietly rewriting the playbook for tech investing.
 
-Nvidia has reportedly committed a massive $5 billion equity investment into Ilya Sutskever’s Safe Superintelligence (SSI) — paired with direct access to Nvidia’s unreleased Vera Rubin GPU platform. 
+Nvidia has reportedly committed a massive $5 billion equity investment into Ilya Sutskever’s Safe Superintelligence (SSI), paired with direct access to Nvidia’s unreleased Vera Rubin GPU platform. 
 
 The result? A research lab with zero commercial products on the market just scaled its compute capacity by an order of magnitude.
 
-This isn't an isolated deal — it’s a standardizing playbook in AI financing:
+This isn't an isolated deal; it is a standardizing playbook in AI financing:
 • CoreWeave: Priority GPU allocations used as collateral for billions in hardware expansion.
 • Inflection & Mistral: Equity investments bundled directly with compute capacity guarantees.
 
@@ -41,7 +41,8 @@ Drop your perspective below. 👇
 ```
 
 ### Writing Rules:
-1. **Hook Elegance**: Use simple, elegant, spoken English ("Nvidia is quietly rewriting the playbook for tech investing.").
-2. **Pivotal Result Question**: Use a "The result?" line to bridge the news fact to the impact.
-3. **Category Header for Discussion**: Frame the closing prompt with "The question for the ecosystem:" or "The question for engineering leads:".
-4. **Emoji Signature**: End with `👇` for comment section direction.
+1. **ABSOLUTELY ZERO EM DASHES (`—` or `--`)**: Em dashes scream AI generation on LinkedIn. Replace all em dashes with commas, semicolons, parentheses, or separate sentences. Enforced in prompt and via Python post-processing sanitizer.
+2. **Hook Elegance**: Use simple, elegant, spoken English ("Nvidia is quietly rewriting the playbook for tech investing.").
+3. **Pivotal Result Question**: Use a "The result?" line to bridge the news fact to the impact.
+4. **Category Header for Discussion**: Frame the closing prompt with "The question for the ecosystem:" or "The question for engineering leads:".
+5. **Emoji Signature**: End with `👇` for comment section direction.

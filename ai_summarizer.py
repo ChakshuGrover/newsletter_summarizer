@@ -627,11 +627,11 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     ```
     Nvidia is quietly rewriting the playbook for tech investing.
 
-    Nvidia has reportedly committed a massive $5 billion equity investment into Ilya Sutskever’s Safe Superintelligence (SSI) — paired with direct access to Nvidia’s unreleased Vera Rubin GPU platform. 
+    Nvidia has reportedly committed a massive $5 billion equity investment into Ilya Sutskever’s Safe Superintelligence (SSI), paired with direct access to Nvidia’s unreleased Vera Rubin GPU platform. 
 
     The result? A research lab with zero commercial products on the market just scaled its compute capacity by an order of magnitude.
 
-    This isn't an isolated deal — it’s a standardizing playbook in AI financing:
+    This isn't an isolated deal; it is a standardizing playbook in AI financing:
     • CoreWeave: Priority GPU allocations used as collateral for billions in hardware expansion.
     • Inflection & Mistral: Equity investments bundled directly with compute capacity guarantees.
 
@@ -647,6 +647,7 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
     ```
 
     **CRITICAL ANTI-ADVERTISING & HUMAN HOOK RULES:**
+    - **ABSOLUTELY ZERO EM DASHES (`—` or `--`)**: Em dashes scream AI generation. Do NOT use em dashes (`—` or `--`) under any circumstances. Replace all em dashes with commas, semicolons, colons, or separate sentences.
     - **ELEGANT SPOKEN HOOKS**: Open with simple, elegant, intriguing English that a founder or tech strategist would actually say out loud (e.g. "Nvidia is quietly rewriting the playbook for tech investing.").
     - **PIVOTAL RESULT QUESTION**: Use a "The result?" bridge line to connect news facts to their structural impact (e.g. "The result? A research lab with zero commercial products on the market just scaled...").
     - **DISCUSSION HEADER**: Frame closing discussion prompts with a clear question header (e.g. "The question for the ecosystem:") and end with the downward finger emoji (`👇`).
@@ -694,7 +695,15 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
 
             if not resp or not resp.text: return []
 
-            return [p.strip() for p in resp.text.split("|||POST_SEPARATOR|||") if p.strip()]
+            raw_posts = [p.strip() for p in resp.text.split("|||POST_SEPARATOR|||") if p.strip()]
+            
+            # Programmatic Em-Dash Sanitizer: Guarantee no em dashes slip through
+            sanitized_posts = []
+            for post in raw_posts:
+                cleaned = post.replace(" — ", ", ").replace("—", ", ").replace(" -- ", ", ").replace("--", ", ")
+                sanitized_posts.append(cleaned)
+
+            return sanitized_posts
         except Exception as e:
             logging.error(f"Error generating LinkedIn posts: {e}")
             return []
