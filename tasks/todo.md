@@ -578,3 +578,24 @@ All link-resolution and recentness updates have been successfully completed and 
    * The broken Substack link in Story 3 resolved cleanly to its real GitHub destination page (`github.com/epoch-research/MirrorCode`).
    * The old news (the tech open-weights petition from last week) was successfully filtered out, replaced by a fresh Apple wearable release.
 
+---
+
+# Task: Resolve HubSpot / DeepLearning.ai Tracking Links
+
+The goal is to ensure giant HubSpot tracking URLs (e.g., info.deeplearning.ai/e3t/Ctc/...) are successfully resolved to their clean, direct destination URLs, and that HubSpot-specific tracking parameters (_hsenc, _hsmi) are stripped out of the final outputs.
+
+## Todo List
+
+- [x] **Phase 1: Update Redirect Resolver for HubSpot**
+  - [x] Add HubSpot `/e3t/` to the list of `redirectors` in [utils.py](file:///Users/chakshugrover/newsletter_summarizer/utils.py).
+  - [x] Add logic to detect JS fingerprinting redirect challenges, extract the `targetURL` string, substitute the standard `_jss=-2` with `_jss=1` (or replace the trailing `-2` with `1`), and make the redirect request to obtain the final URL.
+- [x] **Phase 2: Strip HubSpot Parameters**
+  - [x] Add `_hsenc` and `_hsmi` to the `unwanted` parameters list inside `sanitize_url` in [utils.py](file:///Users/chakshugrover/newsletter_summarizer/utils.py).
+- [x] **Phase 3: Verification**
+  - [x] Test resolving a real deeplearning.ai tracking link and verify that it returns a clean, direct web URL.
+
+## Review: HubSpot Link Resolution Results
+
+1. **JS Challenge Resolution**: Successfully implemented extraction logic to parse HubSpot JS redirection strings and resolve them to their HTTP targets.
+2. **Shortened & Clean URLs**: Added `_hsenc` and `_hsmi` to the parameter stripping configuration. Verified that the giant 600+ character tracking URLs are now replaced by clean, direct URLs (e.g., `https://lieu.house.gov/...` with no tracking junk) in WhatsApp and all other outputs.
+

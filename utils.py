@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 def resolve_redirects(url):
     """Resolve tracking links to their final destination URL using a browser User-Agent."""
-    redirectors = ['link.mail', 'click.mail', 't.mail', 'tracking.tldrnewsletter.com', 'ben-evans.us6.list-manage.com', 'alphasignal.ai', 'substack.com/redirect', 'substack.com/app-link']
+    redirectors = ['link.mail', 'click.mail', 't.mail', 'tracking.tldrnewsletter.com', 'ben-evans.us6.list-manage.com', 'alphasignal.ai', 'substack.com/redirect', 'substack.com/app-link', '/e3t/']
     if any(d in url.lower() for d in redirectors):
         headers = {}
         if 'substack.com' in url.lower():
@@ -15,6 +15,19 @@ def resolve_redirects(url):
         try:
             # Many tracking servers require a GET request to process the redirect properly
             response = requests.get(url, allow_redirects=True, timeout=5, headers=headers)
+            
+            # Handle HubSpot/DeepLearning JS tracking challenge pages
+            if '/e3t/' in url.lower() or 'hubspot' in response.url.lower():
+                import re
+                match = re.search(r'var targetURL\s*=\s*"([^"]+)"', response.text)
+                if match:
+                    js_target = match.group(1)
+                    if js_target.endswith('-2'):
+                        js_target = js_target[:-2] + '1'
+                    elif '_jss=-2' in js_target:
+                        js_target = js_target.replace('_jss=-2', '_jss=1')
+                    response = requests.get(js_target, allow_redirects=True, timeout=5, headers=headers)
+            
             return response.url
         except Exception as e:
             logging.debug(f"Failed to resolve redirect for {url}: {e}")
@@ -38,7 +51,7 @@ def sanitize_url(url, resolve=False):
         query = urllib.parse.parse_qs(parsed.query)
         
         # Parameters to strip
-        unwanted = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'redirect', '_bhlid', '_bhcp', 'jwt_token']
+        unwanted = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'redirect', '_bhlid', '_bhcp', 'jwt_token', '_hsenc', '_hsmi']
         
         # Filter out any key that starts with utm_ or is in our unwanted list
         clean_query = {k: v for k, v in query.items() if not k.startswith('utm_') and k not in unwanted}

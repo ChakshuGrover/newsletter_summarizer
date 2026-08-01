@@ -11,3 +11,7 @@
 ## Rate Limit Optimization
 - **Pattern**: Manual pipeline dry-runs on live data consume a batch of API calls (summarization chunking, consolidation, and output formatting). Running multiple manual executions back-to-back quickly depletes free-tier daily quotas (20 RPD limit).
 - **Resolution**: Group summaries in larger chunks where possible and limit the frequency of manual forced runs. Advise users that daily automated operations remain well within the free quota limits.
+
+## HubSpot / DeepLearning.ai Link Redirection & Resolution
+- **Pattern**: HubSpot click-tracking URLs (containing `/e3t/` in the path) serve a JavaScript-based browser fingerprinting challenge (status 200) instead of standard HTTP redirects.
+- **Resolution**: Perform a GET request to the tracking link, parse the response body using regex to extract the target URL, replace the fingerprinting query state `_jss=-2` with `_jss=1` (or trailing `-2` with `1`), and make a second request to follow the actual HTTP 307 redirect. Additionally, include `_hsenc` and `_hsmi` in the sanitization configuration to strip the long tracking parameters from the resolved target URL.
