@@ -605,52 +605,105 @@ Please provide summaries for all {len(chunk)} emails in the format specified abo
         except Exception as e:
             logging.error(f"Error generating digest data: {e}")
             return {"macro_themes": [], "top_stories": []}
- 
+
     def generate_linkedin_posts(self, summaries):
-        # Restored the full, high-quality LinkedIn prompt from original
+        """Generates 5 distinct algorithm-optimized LinkedIn post options based on daily news summaries."""
         combined = ""
         for i, item in enumerate(summaries):
             combined += f"Story {i+1}:\nSubject: {item['subject']}\nSummary: {item['summary_text']}\n\n"
- 
-        prompt = f"""Act as a seasoned tech founder, engineering leader, and principal strategist (in the analytical style of Ben Thompson or a hands-on startup CTO). 
-        Write three highly authentic, insightful, and readable posts for a professional technical audience. 
+
+        prompt = f"""Act as a seasoned tech founder, engineering leader, and principal strategist (writing with the sharp analytical depth of Ben Thompson / Stratechery or an opinionated startup CTO). 
+        Write FIVE highly authentic, insightful, and readable posts for a professional technical audience on LinkedIn. 
         Each post must be grounded directly in the provided newsletter summaries.
 
-    **Narrative Options (Generate exactly these 3 styles):**
-    1. **Option 1: The Technical Breakdown**: Select one significant technical development, product launch, or open-source release. Explain how it works, the engineering tradeoffs it resolves, and why it represents a real milestone, rather than just repeating marketing claims.
-    2. **Option 2: The Strategic Shift**: Analyze how multiple stories of the day connect to form a larger trend in industry dynamics, infrastructure investments, or competitive positioning (e.g. open source versus proprietary, developer tooling costs, hardware margins).
-    3. **Option 3: The Pragmatic Builder's Take**: Write from the perspective of an engineering team lead or founder evaluating today's news and deciding what has actual developer utility vs what is just noise.
+    **Narrative Options (Generate exactly these 5 styles):**
+    1. **Option 1: The Architectural Tradeoff**: Select a key technical development or release. Focus strictly on the underlying engineering trade-offs (e.g. latency vs accuracy, memory bandwidth vs model size, maintenance overhead vs custom code), NOT vendor product marketing.
+    2. **Option 2: The Macro Market Shift**: Analyze how multiple stories connect to reveal broader industry dynamics, capital allocation, hardware vs software leverage, or open-source vs proprietary incentives (Stratechery style).
+    3. **Option 3: The Operator's Utility Assessment**: Evaluate today's developments from a lead architect's perspective: what actually changes production workflows versus what is just hype or incremental noise.
+    4. **Option 4: The 5-Slide PDF Carousel Strategy Outline**: Formatted as a 5-slide text template for a LinkedIn PDF Carousel (Slide 1: Hook Title -> Slide 2: Structural Context -> Slide 3: Engineering/Market Shift -> Slide 4: Strategic Impact -> Slide 5: Takeaway). Formatted with [Slide 1], [Slide 2], etc.
+    5. **Option 5: The Contrarian Pattern Interrupt**: Open with a bold, counter-intuitive thesis that challenges popular tech consensus, driving a high-value discussion in the comments.
 
-    **Critical Writing Rules:**
-    - **No "Broetry" Formatting**: Avoid single-sentence paragraphs spaced with blank lines. Write in normal, cohesive paragraphs (2-4 sentences per paragraph) with logical flow. You may use standard bulleted lists when outlining technical steps or facts, but do not structure the entire post as a line-by-line list.
-    - **Factual Grounding**: Ground the posts in the specific details, names, and numbers in the summaries. Do not write high-level, generic summaries.
-    - **Link Preservation**: For every link or URL provided in the summaries (e.g. `<a href="URL">Subject</a>` or standard bracketed links), you MUST extract and use the actual, real URL in your posts if you reference that story. Do NOT invent, hallucinate, or use generic placeholder URLs (like `github.com/example/tool` or `example.com`). If a story has no URL in the summaries, do not include any links for it.
-    - **Story Diversity (CRITICAL)**: The 3 options represent alternative draft posts for the day. To provide diverse options, do NOT focus all 3 posts on the same single news event. If there are multiple distinct stories in the summaries, Option 1 should focus on one technical story, Option 2 should synthesize a different set of stories, and Option 3 should focus on the developer utility of another distinct story. Provide varied angles and cover different developments across the posts.
-    - **Authentic Openers & Endings**: Do NOT use formulaic hooks (e.g. starting with fake statistics or cliché questions) or clinical, textbook descriptions (like "The market dynamics are shifting"). Open directly with an active, opinionated statement (under 15 words) about the real implication of the news. Do NOT end with boilerplate, low-effort engagement questions (like "What do you think?"). Conclude naturally with a thoughtful strategic takeaway or industry prediction.
-    - **Tone**: Keep it conversational, sharp, technical, and objective (the analytical style of Ben Thompson/Stratechery or an opinionated CTO talking to peers). Use active verbs and active voice. Avoid academic/clinical economics textbook jargon. Instead of "This margin compression is forcing proprietary AI providers to seek...", write "This margin squeeze forces proprietary labs to...". Keep it punchy and direct.
-    - **Emojis & Hashtags**: Use at most 1 emoji per post, only where natural. Include exactly 3 highly relevant hashtags at the very end of each post.
+    **MASTERPIECE APPROVED EXEMPLAR (Study this structure, hook elegance, and layout):**
+    ```
+    Nvidia is quietly rewriting the playbook for tech investing.
+
+    Nvidia has reportedly committed a massive $5 billion equity investment into Ilya Sutskever’s Safe Superintelligence (SSI), paired with direct access to Nvidia’s unreleased Vera Rubin GPU platform. 
+
+    The result? A research lab with zero commercial products on the market just scaled its compute capacity by an order of magnitude.
+
+    This isn't an isolated deal; it is a standardizing playbook in AI financing:
+    • CoreWeave: Priority GPU allocations used as collateral for billions in hardware expansion.
+    • Inflection & Mistral: Equity investments bundled directly with compute capacity guarantees.
+
+    Traditional VC evaluated user traction, unit economics, and early revenue metrics. Today, major chipmakers bypass standard equity stages to deploy capital and physical compute directly to research teams based on founder pedigree and mission alone.
+
+    The question for the ecosystem:
+    Does handing billions in equity and next-gen compute to pre-product labs accelerate technical breakthroughs, or does it distort market dynamics by picking winners before product validation?
+
+    Drop your perspective below. 👇
+
+    (Link in comments)
+    #VentureCapital #ArtificialIntelligence #Semiconductors #Startups
+    ```
+
+    **CRITICAL ANTI-ADVERTISING & HUMAN HOOK RULES:**
+    - **ABSOLUTELY ZERO EM DASHES (`—` or `--`)**: Em dashes scream AI generation. Do NOT use em dashes (`—` or `--`) under any circumstances. Replace all em dashes with commas, semicolons, colons, or separate sentences.
+    - **ELEGANT SPOKEN HOOKS**: Open with simple, elegant, intriguing English that a founder or tech strategist would actually say out loud (e.g. "Nvidia is quietly rewriting the playbook for tech investing.").
+    - **PIVOTAL RESULT QUESTION**: Use a "The result?" bridge line to connect news facts to their structural impact (e.g. "The result? A research lab with zero commercial products on the market just scaled...").
+    - **DISCUSSION HEADER**: Frame closing discussion prompts with a clear question header (e.g. "The question for the ecosystem:") and end with the downward finger emoji (`👇`).
+    - **DEAL STRUCTURE PRECISION**: Distinguish accurately between equity investments (e.g. reported $5B) and hardware access (e.g. order of magnitude compute scale boost on Vera Rubin).
+    - **PATTERN & HISTORICAL CONTEXT**: When analyzing market shifts or strategy news, weave in relevant historical precedent and past examples (e.g. CoreWeave, Inflection, Mistral when discussing Nvidia compute deals) to ground the story in a broader pattern rather than a single isolated event.
+    - **STRICTLY NO PR OR ADVERTORIAL TONE (BANNED)**: Do NOT write posts that sound like product announcements, press releases, or marketing pitches (e.g. NEVER start or structure a post like "Microsoft just released X model designed explicitly to solve Y"). Write as an independent analyst or CTO sharing strategic principles, not as a PR megaphone for tech vendors.
+    - **CONTRAST STRUCTURE**: Contrast *How things used to work* vs *What is happening now* (as shown in the approved exemplar above).
+    - **"See-More" Fold Hook**: The first 1-2 sentences (under 12 words) of every post MUST be a sharp, natural pattern interrupt designed to make users click "...see more".
+    - **No Outbound Link Penalty**: Do NOT place raw external URLs inside the main post body text (LinkedIn suppresses post reach for outbound links). Append `(Link in comments)` at the end instead.
+    - **No "Broetry" Formatting**: Write in clean, cohesive paragraphs (2-4 sentences per paragraph) with logical flow. Avoid single-sentence line-by-line spam.
+    - **Factual Grounding**: Ground the posts in real technical facts, numbers, and names from the summaries without fluff.
+    - **Story Diversity**: Ensure the 5 options explore distinct stories and diverse angles across the summaries.
+    - **Tone**: Conversational, sharp, technical, and human (Stratechery / CTO talking to peers). Use active verbs and active voice.
+    - **Emojis & Hashtags**: Use at most 1 emoji per post. Include exactly 3 relevant hashtags at the very end.
 
     **Formatting Rules (CRITICAL):**
-    - NO meta-text, option labels (e.g. do NOT include "Option 1" or "The Technical Breakdown" headers), or intro/outro conversational filler.
-    - Separate the three options using exactly: |||POST_SEPARATOR|||
+    - NO meta-text, option labels (e.g. do NOT include "Option 1" headers), or conversational filler.
+    - Separate the FIVE options using exactly: |||POST_SEPARATOR|||
+    - At the very end of each post option (after hashtags and (Link in comments)), append on a new line: `SOURCE_LINK: <actual_primary_url_from_summaries>` (or `SOURCE_LINK: None` if no URL is present).
     - **HUMAN-LIKE WRITING STANDARDS (CRITICAL)**:
-      * Do NOT use em dashes (`—` or `--`) under any circumstances. Use standard commas, parentheses, or separate sentences instead.
-      * Strictly avoid AI jargon, filler, and transition buzzwords. BANNED words include: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize*.
-      * Ground the writing in plain, direct facts. Eliminate all marketing hype and promotional fluff.
+      * Do NOT use em dashes (`—` or `--`) under any circumstances. Use commas, parentheses, or separate sentences.
+      * Strictly avoid AI jargon and filler words. BANNED: *delve, tapestry, testament, pinnacle, cutting-edge, game-changer, revolutionary, groundbreaking, demystify, catalyst, beacon, underpins, underscores, moreover, furthermore, notably, transform, revolutionize, systematically, decoupling*.
 
     Summaries:
     {combined}"""
         
         try:
-            resp = self.retry_with_backoff(
-                lambda: self.model.generate_content(
-                    prompt, 
-                    generation_config={"temperature": 0.5}
+            # Enable Google Search Grounding exclusively for LinkedIn post generation
+            try:
+                search_model = genai.GenerativeModel('gemini-3.6-flash', tools='google_search_retrieval')
+                resp = self.retry_with_backoff(
+                    lambda: search_model.generate_content(
+                        prompt, 
+                        generation_config={"temperature": 0.5}
+                    )
                 )
-            )
+            except Exception as search_err:
+                logging.warning(f"Google Search Grounding failed for LinkedIn posts ({search_err}), falling back to standard model.")
+                resp = self.retry_with_backoff(
+                    lambda: self.model.generate_content(
+                        prompt, 
+                        generation_config={"temperature": 0.5}
+                    )
+                )
+
             if not resp or not resp.text: return []
- 
-            return [p.strip() for p in resp.text.split("|||POST_SEPARATOR|||") if p.strip()]
+
+            raw_posts = [p.strip() for p in resp.text.split("|||POST_SEPARATOR|||") if p.strip()]
+            
+            # Programmatic Em-Dash Sanitizer: Guarantee no em dashes slip through
+            sanitized_posts = []
+            for post in raw_posts:
+                cleaned = post.replace(" — ", ", ").replace("—", ", ").replace(" -- ", ", ").replace("--", ", ")
+                sanitized_posts.append(cleaned)
+
+            return sanitized_posts
         except Exception as e:
             logging.error(f"Error generating LinkedIn posts: {e}")
             return []

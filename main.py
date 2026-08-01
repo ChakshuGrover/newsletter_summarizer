@@ -649,15 +649,42 @@ def main():
         try:
             from config import TELEGRAM_LINKEDIN_CHAT_ID
             if TELEGRAM_LINKEDIN_CHAT_ID:
-                logging.info("Generating LinkedIn post options...")
+                logging.info("Generating 5 LinkedIn post options...")
                 linkedin_posts = summarizer.generate_linkedin_posts(summaries)
                 if linkedin_posts:
                     logging.info(f"Sending {len(linkedin_posts)} LinkedIn post options to Telegram channel: {TELEGRAM_LINKEDIN_CHAT_ID}")
-                    send_telegram_message("📢 <b>Daily LinkedIn Post Options</b> (Ready to Copy/Paste):", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
+                    send_telegram_message("📢 <b>Daily LinkedIn Post Options</b> (Ready to Copy/Paste):\n<i>(Tap/click a block below to copy)</i>", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
                     time.sleep(1)
-                    for idx, post in enumerate(linkedin_posts, 1):
-                        send_telegram_message(f"<b>--- Option {idx} ---</b>\n\n{post}", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
+                    
+                    option_titles = [
+                        "Option 1: The Technical Breakdown",
+                        "Option 2: The Strategic Shift",
+                        "Option 3: The Pragmatic Builder's Take",
+                        "Option 4: The 5-Slide PDF Carousel Outline",
+                        "Option 5: The Pattern Interrupt / Discussion Starter"
+                    ]
+                    
+                    for idx, raw_post in enumerate(linkedin_posts, 1):
+                        title = option_titles[idx-1] if idx <= len(option_titles) else f"Option {idx}"
+                        
+                        # Extract SOURCE_LINK if appended
+                        source_url = None
+                        post_body = raw_post
+                        if "SOURCE_LINK:" in raw_post:
+                            parts = raw_post.split("SOURCE_LINK:")
+                            post_body = parts[0].strip()
+                            possible_url = parts[1].strip()
+                            if possible_url.startswith("http"):
+                                source_url = possible_url
+                                
+                        escaped_post = html.escape(post_body)
+                        send_telegram_message(f"<b>--- {title} ---</b>\n<pre>{escaped_post}</pre>", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
                         time.sleep(1)
+                        
+                        if source_url:
+                            escaped_url = html.escape(source_url)
+                            send_telegram_message(f"🔗 <b>Link for comment:</b>\n<pre>{escaped_url}</pre>", chat_id=TELEGRAM_LINKEDIN_CHAT_ID)
+                            time.sleep(1)
             else:
                 logging.warning("TELEGRAM_LINKEDIN_CHAT_ID is not configured. Skipping LinkedIn post generation.")
         except Exception as e:
